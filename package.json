@@ -1,0 +1,16 @@
+{
+  "name": "grand-theft-code",
+  "version": "1.0.0",
+  "description": "侠盗猎码 — 用真·Python 和真·C++ 闯关学编程的赛博朋克网页游戏 / A cyberpunk browser game that teaches real Python & C++ through missions",
+  "scripts": {
+    "test": "node tests/test_python.mjs && node tests/test_cpp.mjs && node tests/test_levels.mjs",
+    "test:all": "npm test && node tests/test_integration.mjs",
+    "test:integration": "node tests/test_integration.mjs",
+    "start": "node serve.mjs"
+  },
+  "keywords": ["education", "game", "python", "cpp", "interpreter", "learn-to-code", "bilingual"],
+  "license": "MIT",
+  "devDependencies": {
+    "jsdom": "^24.0.0"
+  }
+}
