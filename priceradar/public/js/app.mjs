@@ -2,6 +2,7 @@
 import { fetchCompare, fetchHistory, DIMENSIONS, PRESETS } from './api.mjs';
 import { drawRadar, drawSparkline, RADAR_COLORS } from './radar.mjs';
 import { isFav, toggleFav, favCount, getFavorites, getAlert, setAlert, clearAlert } from './store.mjs';
+import { initPWA } from './pwa.mjs';
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
@@ -29,6 +30,7 @@ function init() {
   $('#closeFav').addEventListener('click', () => $('#favModal').classList.add('hidden'));
   $('#favModal').addEventListener('click', (e) => { if (e.target.id === 'favModal') e.target.classList.add('hidden'); });
   updateFavCount();
+  initPWA();
 }
 
 function updateFavCount() { $('#favCount').textContent = favCount(); }

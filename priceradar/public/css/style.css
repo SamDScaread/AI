@@ -246,6 +246,9 @@ strong { color: var(--ink); }
 .fav-table td { text-align: left; }
 .fav-table .btn { margin: 2px; padding: 5px 10px; font-size: 12.5px; }
 
+.install-btn { display: inline-block; margin: 0 auto 14px; background: var(--brand); color: #fff; border: none; border-radius: 12px; padding: 11px 22px; font-size: 14px; font-weight: 700; box-shadow: var(--shadow); }
+.install-btn:hover { filter: brightness(1.06); }
+
 .footer { text-align: center; color: var(--muted); font-size: 12px; padding: 26px 16px 90px; }
 
 .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: #0b1f29; color: #fff; padding: 10px 18px; border-radius: 10px; font-size: 13px; z-index: 60; box-shadow: var(--shadow-lg); }

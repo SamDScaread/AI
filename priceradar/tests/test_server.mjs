@@ -65,5 +65,23 @@ await testAsync('未知静态路径 → 404，目录穿越被拦', async () => {
   eq(r2.status, 404);
 });
 
+await testAsync('PWA 资源可访问：manifest / sw / 图标', async () => {
+  const m = await fetch(base + '/manifest.webmanifest');
+  eq(m.status, 200);
+  assert(m.headers.get('content-type').includes('manifest+json'), 'manifest MIME');
+  const manifest = await m.json();
+  eq(manifest.display, 'standalone');
+  assert(manifest.icons.length >= 2);
+  assert(manifest.icons.some((i) => i.purpose === 'maskable'), '应含 maskable 图标');
+
+  const sw = await fetch(base + '/sw.js');
+  eq(sw.status, 200);
+  assert(sw.headers.get('content-type').includes('javascript'), 'sw MIME 为 JS');
+
+  const icon = await fetch(base + '/icons/icon-192.png');
+  eq(icon.status, 200);
+  eq(icon.headers.get('content-type'), 'image/png');
+});
+
 server.close();
 summary('server');
