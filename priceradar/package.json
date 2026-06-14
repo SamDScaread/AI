@@ -1,0 +1,18 @@
+{
+  "name": "priceradar",
+  "version": "0.1.0",
+  "description": "比价雷达 · PriceRadar — 全网聚合同款商品，按价格/质量/卫生资质/成分/营养/包装/物流/店铺信誉多维打分，选出哪个平台哪个店买最优 / Whole-web price & quality comparison",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node tests/test_currency.mjs && node tests/test_score.mjs && node tests/test_match.mjs && node tests/test_pipeline.mjs && node tests/test_features.mjs && node tests/test_openfoodfacts.mjs && node tests/test_adapters.mjs && node tests/test_server.mjs",
+    "icons": "node scripts/gen-icons.mjs",
+    "test:frontend": "node tests/test_frontend.mjs",
+    "test:all": "npm test && npm run test:frontend"
+  },
+  "keywords": ["price-comparison", "ecommerce", "shopping", "比价", "scraper", "ranking"],
+  "license": "MIT",
+  "devDependencies": {
+    "jsdom": "^24.0.0"
+  }
+}

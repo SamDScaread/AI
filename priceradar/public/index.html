@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="theme-color" content="#0e7490" />
+  <title>比价雷达 · PriceRadar — 全网比价 · 一眼选最优</title>
+  <meta name="description" content="全网聚合同一商品的所有厂家与店铺，按价格、质量、卫生资质、成分、营养、包装、物流、店铺信誉多维打分，为你选出哪个平台哪个店买到最优。" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="./icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="比价雷达" />
+  <link rel="stylesheet" href="./css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">📡</span>
+      <div class="brand-text">
+        <h1>比价雷达 <span class="en">PriceRadar</span></h1>
+        <p class="tagline">全网聚合 · 多维打分 · 一眼选最优</p>
+      </div>
+    </div>
+    <form id="searchForm" class="searchbar" autocomplete="off">
+      <input id="searchInput" type="search" placeholder="搜想买的东西，如：每日坚果 / 婴儿奶粉 / 维生素C / 蓝牙耳机" aria-label="搜索商品" />
+      <button type="submit" id="searchBtn">比价</button>
+    </form>
+    <button type="button" id="favBtn" class="fav-btn" aria-label="我的收藏">♥ 收藏 <span id="favCount">0</span></button>
+  </header>
+
+  <main class="layout">
+    <!-- 左侧：权重 / 偏好 -->
+    <aside class="panel weights" id="weightsPanel" aria-label="比价偏好">
+      <div class="panel-head">
+        <h2>我的偏好</h2>
+        <button type="button" class="link" id="resetWeights">重置</button>
+      </div>
+      <p class="hint">拖动滑块告诉我你更看重什么，推荐会实时重排。</p>
+      <div class="presets" id="presets">
+        <button type="button" data-preset="balanced" class="chip active">均衡</button>
+        <button type="button" data-preset="thrifty" class="chip">省钱</button>
+        <button type="button" data-preset="quality" class="chip">品质优先</button>
+        <button type="button" data-preset="health" class="chip">健康成分</button>
+      </div>
+      <div id="sliders" class="sliders"></div>
+    </aside>
+
+    <!-- 右侧：结果 -->
+    <section class="results" id="results">
+      <div class="empty" id="emptyState">
+        <div class="empty-art">🛒🔍</div>
+        <h2>搜一件商品，开始全网比价</h2>
+        <p>我会把各平台、各店铺卖的同款聚到一起，折算到人民币、按你的偏好打分，挑出<strong>哪个平台哪个店</strong>买最划算。</p>
+        <div class="suggestions" id="suggestions">
+          <span>试试：</span>
+          <button class="chip" data-q="每日坚果">每日坚果</button>
+          <button class="chip" data-q="婴儿配方奶粉">婴儿奶粉</button>
+          <button class="chip" data-q="维生素C泡腾片">维生素C</button>
+          <button class="chip" data-q="烟酰胺精华">护肤精华</button>
+          <button class="chip" data-q="蓝牙耳机">蓝牙耳机</button>
+        </div>
+      </div>
+
+      <div id="loading" class="loading hidden">
+        <div class="spinner"></div>
+        <p>正在全网聚合同款、折算汇率、多维打分…</p>
+      </div>
+
+      <div id="resultBody" class="hidden">
+        <div id="hero"></div>
+        <div class="result-meta" id="resultMeta"></div>
+        <div id="productList" class="product-list"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 对比抽屉 -->
+  <div id="compareBar" class="compare-bar hidden">
+    <span id="compareCount">已选 0 件对比</span>
+    <div class="spacer"></div>
+    <button class="link" id="clearCompare">清空</button>
+    <button class="primary" id="openCompare">并排对比</button>
+  </div>
+
+  <div id="compareModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="商品对比">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>并排对比</h2>
+        <button class="icon-btn" id="closeCompare" aria-label="关闭">✕</button>
+      </div>
+      <div class="modal-body" id="compareBody"></div>
+    </div>
+  </div>
+
+  <div id="favModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="我的收藏">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>我的收藏 &amp; 到价提醒</h2>
+        <button class="icon-btn" id="closeFav" aria-label="关闭">✕</button>
+      </div>
+      <div class="modal-body" id="favBody"></div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <button id="installBtn" class="install-btn hidden">📲 安装到桌面 / 手机</button>
+    <p>比价雷达 · PriceRadar — 演示数据驱动；接入各平台联盟 API / 抓取后即为实时数据。请遵守各平台服务条款与当地法律。</p>
+  </footer>
+
+  <script type="module" src="./js/app.mjs"></script>
+</body>
+</html>
