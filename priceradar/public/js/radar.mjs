@@ -81,3 +81,49 @@ function hexA(hex, a) {
 }
 
 export const RADAR_COLORS = ['#0e7490', '#f59e0b', '#7c3aed', '#16a34a'];
+
+// 迷你价格走势折线图
+export function drawSparkline(canvas, series, opts = {}) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = opts.width || 280, h = opts.height || 70;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+  const ctx = canvas.getContext && canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, w, h);
+  if (!series || series.length < 2) return;
+
+  const vals = series.map((p) => p.priceCNY);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const span = max - min || 1;
+  const pad = 8;
+  const x = (i) => pad + (i / (series.length - 1)) * (w - pad * 2);
+  const y = (v) => h - pad - ((v - min) / span) * (h - pad * 2);
+
+  // 渐变填充
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, 'rgba(14,116,144,.22)');
+  grad.addColorStop(1, 'rgba(14,116,144,0)');
+  ctx.beginPath();
+  series.forEach((p, i) => (i === 0 ? ctx.moveTo(x(i), y(p.priceCNY)) : ctx.lineTo(x(i), y(p.priceCNY))));
+  ctx.lineTo(x(series.length - 1), h - pad); ctx.lineTo(x(0), h - pad); ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+
+  // 折线
+  ctx.beginPath();
+  series.forEach((p, i) => (i === 0 ? ctx.moveTo(x(i), y(p.priceCNY)) : ctx.lineTo(x(i), y(p.priceCNY))));
+  ctx.strokeStyle = '#0e7490'; ctx.lineWidth = 2; ctx.stroke();
+
+  // 当前点
+  const last = series.length - 1;
+  ctx.beginPath(); ctx.arc(x(last), y(vals[last]), 3, 0, Math.PI * 2);
+  ctx.fillStyle = '#dc2626'; ctx.fill();
+
+  // 最低价标注
+  const minIdx = vals.indexOf(min);
+  ctx.fillStyle = '#16a34a';
+  ctx.font = '10px -apple-system, sans-serif';
+  ctx.textAlign = minIdx > series.length / 2 ? 'right' : 'left';
+  ctx.fillText(`最低 ¥${min}`, x(minIdx), y(min) - 5);
+}

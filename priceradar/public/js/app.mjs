@@ -1,6 +1,7 @@
 // 比价雷达 · PriceRadar — 前端主逻辑
-import { fetchCompare, DIMENSIONS, PRESETS } from './api.mjs';
-import { drawRadar, RADAR_COLORS } from './radar.mjs';
+import { fetchCompare, fetchHistory, DIMENSIONS, PRESETS } from './api.mjs';
+import { drawRadar, drawSparkline, RADAR_COLORS } from './radar.mjs';
+import { isFav, toggleFav, favCount, getFavorites, getAlert, setAlert, clearAlert } from './store.mjs';
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
@@ -24,7 +25,13 @@ function init() {
   $('#openCompare').addEventListener('click', openCompare);
   $('#closeCompare').addEventListener('click', () => $('#compareModal').classList.add('hidden'));
   $('#compareModal').addEventListener('click', (e) => { if (e.target.id === 'compareModal') e.target.classList.add('hidden'); });
+  $('#favBtn').addEventListener('click', openFavorites);
+  $('#closeFav').addEventListener('click', () => $('#favModal').classList.add('hidden'));
+  $('#favModal').addEventListener('click', (e) => { if (e.target.id === 'favModal') e.target.classList.add('hidden'); });
+  updateFavCount();
 }
+
+function updateFavCount() { $('#favCount').textContent = favCount(); }
 
 function onChipQuery(e) {
   const q = e.target.dataset.q;
@@ -177,7 +184,50 @@ function renderProducts(result) {
   // 事件委托
   list.querySelectorAll('[data-toggle]').forEach((btn) => btn.addEventListener('click', () => toggleOffers(btn.dataset.toggle)));
   list.querySelectorAll('[data-cmp]').forEach((chk) => chk.addEventListener('change', (e) => toggleCompare(e.target.dataset.cmp)));
-  // 画维度条已用 HTML，无需 canvas
+  list.querySelectorAll('[data-fav]').forEach((btn) => btn.addEventListener('click', () => onFav(btn.dataset.fav)));
+  list.querySelectorAll('[data-alert]').forEach((btn) => btn.addEventListener('click', () => onAlert(btn.dataset.alert)));
+}
+
+function productByKey(key) { return state.result.products.find((p) => p.key === key); }
+
+function onFav(key) {
+  const p = productByKey(key);
+  const now = toggleFav(p);
+  updateFavCount();
+  const btn = document.querySelector(`[data-fav="${cssAttr(key)}"]`);
+  if (btn) { btn.classList.toggle('on', now); btn.textContent = now ? '♥ 已收藏' : '♡ 收藏'; }
+  toast(now ? '已加入收藏' : '已取消收藏');
+}
+
+function onAlert(key) {
+  const p = productByKey(key);
+  const existing = getAlert(key);
+  const cur = p.priceRange.minCNY;
+  const input = window.prompt(`「${short(p.title)}」当前最低到手 ¥${cur}\n设定到价提醒目标价（人民币），留空清除：`, existing ? existing.target : Math.floor(cur * 0.9));
+  if (input === null) return;
+  if (input.trim() === '') { clearAlert(key); toast('已清除提醒'); }
+  else { setAlert(key, Number(input), p.title); toast(`已设提醒：低于 ¥${Number(input)} 时高亮`); }
+  // 局部刷新该卡
+  refreshCardAlert(key);
+}
+
+function refreshCardAlert(key) {
+  const p = productByKey(key);
+  const card = document.querySelector(`.card[data-key="${cssAttr(key)}"]`);
+  if (!card || !p) return;
+  const slot = card.querySelector('.alert-slot');
+  if (slot) slot.innerHTML = alertBadge(p);
+  const btn = card.querySelector(`[data-alert="${cssAttr(key)}"]`);
+  if (btn) { const a = getAlert(key); btn.classList.toggle('on', !!a); btn.textContent = a ? `🔔 ¥${a.target}` : '🔔 到价提醒'; }
+}
+
+function alertBadge(p) {
+  const a = getAlert(p.key);
+  if (!a) return '';
+  const cur = p.priceRange.minCNY;
+  return cur <= a.target
+    ? `<span class="reached">🎯 已到目标价 ¥${a.target}（现 ¥${cur}）</span>`
+    : `<span class="watching">🔔 监控中：目标 ¥${a.target}（现 ¥${cur}）</span>`;
 }
 
 function productCard(p, idx, result) {
@@ -186,6 +236,8 @@ function productCard(p, idx, result) {
   const dims = result.dimensions;
   const expanded = state.expanded.has(p.key);
   const checked = state.compare.has(p.key) ? 'checked' : '';
+  const fav = isFav(p.key);
+  const alert = getAlert(p.key);
   return `
   <div class="card" data-key="${esc(p.key)}">
     <div class="card-main">
@@ -204,6 +256,7 @@ function productCard(p, idx, result) {
           <span class="price-range">全网区间 ¥${p.priceRange.minCNY}–${p.priceRange.maxCNY}</span>
         </div>
         ${p.bestUnitPriceCNY ? `<div class="unit-price">最优单价 ¥${p.bestUnitPriceCNY}/${esc(p.baseLabel || '单位')}</div>` : ''}
+        <div class="alert-slot">${alertBadge(p)}</div>
       </div>
       <div class="score-box">
         <div class="score-ring">
@@ -218,11 +271,42 @@ function productCard(p, idx, result) {
     </div>
     <div class="card-actions">
       <a class="btn primary" href="${esc(best.url)}" target="_blank" rel="noopener">去最优店铺</a>
-      <button class="btn" data-toggle="${esc(p.key)}">${expanded ? '收起' : `查看全部 ${p.offerCount} 个店铺`}</button>
+      <button class="btn" data-toggle="${esc(p.key)}">${expanded ? '收起' : `全部 ${p.offerCount} 店铺 · 走势 · 详情`}</button>
+      <button class="btn ghost ${fav ? 'on' : ''}" data-fav="${esc(p.key)}">${fav ? '♥ 已收藏' : '♡ 收藏'}</button>
+      <button class="btn ghost ${alert ? 'on' : ''}" data-alert="${esc(p.key)}">${alert ? `🔔 ¥${alert.target}` : '🔔 到价提醒'}</button>
       <label class="cmp-check"><input type="checkbox" data-cmp="${esc(p.key)}" ${checked}/> 加入对比</label>
     </div>
-    <div class="offers ${expanded ? '' : 'hidden'}" id="offers_${cssId(p.key)}">${offersTable(p)}</div>
+    <div class="offers ${expanded ? '' : 'hidden'}" id="offers_${cssId(p.key)}" data-loaded="0">${expandContent(p)}</div>
   </div>`;
+}
+
+// 展开区：商品详情（条形码/产地/工艺/配料/营养表）+ 价格走势 + 各店铺明细
+function expandContent(p) {
+  const a = p.best.attributes || {};
+  const nf = a.nutritionFacts;
+  const nutRows = nf ? Object.entries(nf).map(([k, v]) => `<tr><td>${esc(k.replace('其中-', '└ '))}</td><td>${esc(String(v))}</td></tr>`).join('') : '';
+  return `
+    <div class="expand-grid">
+      <div class="info-panel">
+        <h4>商品详情</h4>
+        <dl class="kv">
+          ${a.barcode ? `<dt>条形码</dt><dd>${esc(a.barcode)}</dd>` : ''}
+          ${a.origin ? `<dt>产地</dt><dd>${esc(a.origin)}</dd>` : ''}
+          ${a.craft ? `<dt>工艺</dt><dd>${esc(a.craft)}</dd>` : ''}
+          ${a.mainContentPct != null ? `<dt>主料含量</dt><dd>${a.mainContentPct}%</dd>` : ''}
+          ${a.packaging ? `<dt>包装</dt><dd>${esc(a.packaging)}</dd>` : ''}
+          ${(a.ingredients && a.ingredients.length) ? `<dt>配料/原料</dt><dd>${a.ingredients.map(esc).join('、')}</dd>` : ''}
+          ${(a.certifications && a.certifications.length) ? `<dt>认证</dt><dd>${a.certifications.map(esc).join('、')}</dd>` : ''}
+        </dl>
+        ${nf ? `<h4>营养成分表（每100g/ml）</h4><table class="nut-table"><tbody>${nutRows}</tbody></table>` : ''}
+      </div>
+      <div class="trend-panel">
+        <h4>价格走势（近 30 天）</h4>
+        <canvas class="spark" id="spark_${cssId(p.key)}"></canvas>
+        <div class="trend-note" id="sparknote_${cssId(p.key)}">加载中…</div>
+      </div>
+    </div>
+    ${offersTable(p)}`;
 }
 
 function dimBar(dim, val) {
@@ -255,10 +339,29 @@ function toggleOffers(key) {
   const product = state.result.products.find((p) => p.key === key);
   if (state.expanded.has(key)) {
     state.expanded.delete(key); el.classList.add('hidden');
-    if (btn) btn.textContent = `查看全部 ${product.offerCount} 个店铺`;
+    if (btn) btn.textContent = `全部 ${product.offerCount} 店铺 · 走势 · 详情`;
   } else {
     state.expanded.add(key); el.classList.remove('hidden');
     if (btn) btn.textContent = '收起';
+    if (el.dataset.loaded === '0') { el.dataset.loaded = '1'; loadHistory(key); }
+  }
+}
+
+async function loadHistory(key) {
+  const product = state.result.products.find((p) => p.key === key);
+  const note = $(`#sparknote_${cssId(key)}`);
+  try {
+    const hist = await fetchHistory(key, product.priceRange.minCNY);
+    const canvas = $(`#spark_${cssId(key)}`);
+    if (canvas) drawSparkline(canvas, hist.series, { width: 300, height: 76 });
+    if (note) {
+      const first = hist.series[0]?.priceCNY, last = hist.series[hist.series.length - 1]?.priceCNY;
+      const diff = last - first;
+      const trend = diff > 0 ? `↑ 涨 ¥${diff.toFixed(2)}` : diff < 0 ? `↓ 降 ¥${(-diff).toFixed(2)}` : '基本持平';
+      note.innerHTML = `区间 ¥${hist.min}–${hist.max} · 30天${trend} · ${hist.realPoints > 1 ? '含真实记录 ' + hist.realPoints + ' 点' : '示例走势（随使用累积真实数据）'}`;
+    }
+  } catch {
+    if (note) note.textContent = '价格走势加载失败';
   }
 }
 
@@ -317,6 +420,42 @@ function openCompare() {
     <table class="cmp-table"><thead>${head}</thead><tbody>${body}</tbody></table>`;
   drawRadar($('#cmpRadar'), dims.map((d) => d.label), datasets, { size: 300 });
   $('#compareModal').classList.remove('hidden');
+}
+
+// ---------- 收藏夹 ----------
+function openFavorites() {
+  const favs = Object.values(getFavorites()).sort((a, b) => b.savedAt - a.savedAt);
+  const body = $('#favBody');
+  if (!favs.length) {
+    body.innerHTML = `<div class="empty" style="box-shadow:none;border:none"><div class="empty-art">♥</div><p>还没有收藏。搜索后点商品卡上的「♡ 收藏」即可加入这里，方便日后回看与比价。</p></div>`;
+  } else {
+    body.innerHTML = `<table class="cmp-table fav-table"><thead><tr><th>商品</th><th>收藏时最优</th><th>最优渠道</th><th>到价提醒</th><th></th></tr></thead><tbody>${
+      favs.map((f) => {
+        const a = getAlert(f.key);
+        return `<tr>
+          <td><b>${esc(f.brand || '')}</b><br><span class="shop-type">${esc(short(f.title))}</span></td>
+          <td>¥${f.savedPrice}</td>
+          <td>${esc(f.bestPlatform || '')}<br><span class="shop-type">${esc(f.bestShop || '')}</span></td>
+          <td>${a ? '🔔 ¥' + a.target : '—'}</td>
+          <td>
+            <button class="btn" data-research="${esc(f.title)}">重新比价</button>
+            <button class="btn ghost" data-unfav="${esc(f.key)}">移除</button>
+          </td></tr>`;
+      }).join('')
+    }</tbody></table>`;
+    body.querySelectorAll('[data-research]').forEach((b) => b.addEventListener('click', () => {
+      $('#favModal').classList.add('hidden');
+      $('#searchInput').value = b.dataset.research;
+      doSearch(b.dataset.research);
+    }));
+    body.querySelectorAll('[data-unfav]').forEach((b) => b.addEventListener('click', () => {
+      toggleFav({ key: b.dataset.unfav, title: '', brand: '', best: {}, priceRange: {} });
+      updateFavCount(); openFavorites();
+      const card = document.querySelector(`[data-fav="${cssAttr(b.dataset.unfav)}"]`);
+      if (card) { card.classList.remove('on'); card.textContent = '♡ 收藏'; }
+    }));
+  }
+  $('#favModal').classList.remove('hidden');
 }
 
 // ---------- 工具 ----------

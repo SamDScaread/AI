@@ -216,6 +216,36 @@ strong { color: var(--ink); }
 .cmp-table .win { background: #ecfdf5; font-weight: 700; }
 .cmp-radar-wrap { display: flex; justify-content: center; margin-bottom: 18px; }
 
+/* 收藏按钮（顶栏） */
+.fav-btn { border: none; background: rgba(255,255,255,.18); color: #fff; border-radius: 12px; padding: 10px 14px; font-size: 14px; font-weight: 600; }
+.fav-btn:hover { background: rgba(255,255,255,.28); }
+.fav-btn #favCount { background: var(--accent); color: #3a2400; border-radius: 999px; padding: 0 7px; font-size: 12px; margin-left: 2px; }
+
+/* 卡片次级按钮 */
+.btn.ghost { background: #f8fafc; }
+.btn.ghost.on { background: #fff1f2; color: #e11d48; border-color: #fecdd3; }
+
+/* 到价提醒徽标 */
+.alert-slot { margin-top: 6px; }
+.alert-slot .reached { display: inline-block; background: #ecfdf5; color: var(--good); border: 1px solid #bbf7d0; border-radius: 8px; padding: 3px 10px; font-size: 12.5px; font-weight: 700; }
+.alert-slot .watching { display: inline-block; background: #fff7ed; color: #b45309; border: 1px solid #fed7aa; border-radius: 8px; padding: 3px 10px; font-size: 12.5px; }
+
+/* 展开区：详情 + 走势 */
+.expand-grid { display: grid; grid-template-columns: 1fr 320px; gap: 18px; padding: 14px 18px; }
+@media (max-width: 680px) { .expand-grid { grid-template-columns: 1fr; } }
+.expand-grid h4 { font-size: 13px; margin: 0 0 8px; color: #334155; }
+.info-panel .kv { display: grid; grid-template-columns: 84px 1fr; gap: 4px 10px; margin: 0 0 12px; font-size: 13px; }
+.info-panel .kv dt { color: var(--muted); }
+.info-panel .kv dd { margin: 0; }
+.nut-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.nut-table td { padding: 4px 8px; border-bottom: 1px solid var(--line); }
+.nut-table td:last-child { text-align: right; color: #334155; font-variant-numeric: tabular-nums; }
+.trend-panel { background: #fafcfe; border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.trend-panel .spark { width: 100%; }
+.trend-note { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.fav-table td { text-align: left; }
+.fav-table .btn { margin: 2px; padding: 5px 10px; font-size: 12.5px; }
+
 .footer { text-align: center; color: var(--muted); font-size: 12px; padding: 26px 16px 90px; }
 
 .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: #0b1f29; color: #fff; padding: 10px 18px; border-radius: 10px; font-size: 13px; z-index: 60; box-shadow: var(--shadow-lg); }

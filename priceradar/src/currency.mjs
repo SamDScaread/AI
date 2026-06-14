@@ -13,12 +13,51 @@ let RATES = {
   HKD: 0.92,
 };
 
+let _ratesMeta = { source: 'static', updatedAt: null };
+
 export function setRates(rates) {
   RATES = { ...RATES, ...rates };
 }
 
 export function getRate(currency) {
   return RATES[currency] ?? null;
+}
+
+export function ratesInfo() {
+  return { ..._ratesMeta, rates: { ...RATES } };
+}
+
+/**
+ * 拉取实时汇率并更新缓存。失败时**静默回退**到现有（静态）汇率，绝不抛出，
+ * 保证离线/被墙环境也能正常比价。
+ * @param {Function} [fetchImpl] 便于测试注入；默认用全局 fetch。
+ * @returns {Promise<{ok:boolean, source:string, error?:string}>}
+ */
+export async function refreshRates(fetchImpl = globalThis.fetch) {
+  if (typeof fetchImpl !== 'function') {
+    return { ok: false, source: _ratesMeta.source, error: 'no fetch available' };
+  }
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 8000);
+    // 免费、无需 key 的公共汇率接口；以 CNY 为基准。
+    const res = await fetchImpl('https://open.er-api.com/v6/latest/CNY', { signal: ctrl.signal });
+    clearTimeout(t);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const r = data.rates || data.conversion_rates;
+    if (!r || !r.USD) throw new Error('malformed rates payload');
+    // 接口给的是「1 CNY = ? 外币」，我们需要「1 外币 = ? CNY」，取倒数。
+    const next = { CNY: 1 };
+    for (const [cur, v] of Object.entries(r)) {
+      if (typeof v === 'number' && v > 0) next[cur] = round(1 / v, 6);
+    }
+    RATES = { ...RATES, ...next };
+    _ratesMeta = { source: 'live', updatedAt: new Date().toISOString() };
+    return { ok: true, source: 'live' };
+  } catch (err) {
+    return { ok: false, source: _ratesMeta.source, error: String(err.message || err) };
+  }
 }
 
 /** 把任意货币金额折算成人民币（保留 2 位）。 */

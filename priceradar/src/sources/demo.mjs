@@ -175,6 +175,10 @@ function makeRaw({ platform, brand, noun, size, cfg, pricePerBase, trueQuality, 
     packaging: pick(cfg.packaging, rng),
     craft: pick(['冷压', '低温烘焙', '古法', '标准工艺', '冻干'], rng),
     nutritionScore: cfg.hasNutrition ? Math.round(lerp(cfg.nutritionRange[0], cfg.nutritionRange[1], trueQuality)) : null,
+    // 条形码（同款各平台共享，强化跨平台/跨语言归并）；按 productKey 确定性生成
+    barcode: eanFromKey(productKey),
+    // 营养成分表（每 100g/ml），同款各平台一致，由 trueQuality 确定性推导
+    nutritionFacts: cfg.hasNutrition ? makeNutritionFacts(cat, trueQuality) : null,
   };
 
   return {
@@ -220,6 +224,32 @@ function makeShopName(platform, brand, shopType) {
   if (platform === 'walmart') return `${base} on Walmart`;
   if (platform === 'aliexpress') return `${base} Global Store`;
   return `${base}${suffix}`;
+}
+
+// 由 productKey 生成 13 位 EAN-13 风格条形码（中国码段 69 开头），确定性、可复现。
+function eanFromKey(key) {
+  const h = (hashStr(key) >>> 0).toString().padStart(11, '0').slice(0, 11);
+  return '69' + h;
+}
+
+// 营养成分表（每 100g/ml）。trueQuality 越高 → 蛋白更高、添加糖/钠更低。
+function makeNutritionFacts(cat, q) {
+  if (cat === 'supplement') {
+    return { 活性成分含量: `${Math.round(lerp(60, 99, q))}%`, 每份单位: '1 片/粒', 添加剂: q > 0.6 ? '无' : '少量赋形剂' };
+  }
+  const base = {
+    food: { energyKJ: [1600, 2600], proteinG: [6, 26], fatG: [8, 45], carbG: [10, 55], sugarG: [2, 30], sodiumMg: [5, 600] },
+    baby: { energyKJ: [1900, 2200], proteinG: [10, 16], fatG: [22, 28], carbG: [50, 58], sugarG: [0, 12], sodiumMg: [100, 220] },
+  }[cat] || { energyKJ: [1500, 2400], proteinG: [4, 20], fatG: [5, 30], carbG: [10, 50], sugarG: [2, 25], sodiumMg: [10, 500] };
+  // 蛋白越高越好(q↑)，糖/钠越低越好(q↑→取低端)
+  return {
+    能量: `${Math.round(lerp(base.energyKJ[0], base.energyKJ[1], 0.5))} kJ`,
+    蛋白质: `${round1(lerp(base.proteinG[0], base.proteinG[1], q))} g`,
+    脂肪: `${round1(lerp(base.fatG[1], base.fatG[0], q))} g`,
+    碳水化合物: `${round1(lerp(base.carbG[0], base.carbG[1], 0.5))} g`,
+    '其中-糖': `${round1(lerp(base.sugarG[1], base.sugarG[0], q))} g`,
+    钠: `${Math.round(lerp(base.sodiumMg[1], base.sodiumMg[0], q))} mg`,
+  };
 }
 
 // ---- 工具 ----

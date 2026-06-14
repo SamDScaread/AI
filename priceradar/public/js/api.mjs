@@ -9,6 +9,13 @@ export async function fetchCompare(query, weights) {
   return res.json();
 }
 
+export async function fetchHistory(key, price) {
+  const params = new URLSearchParams({ key, price: String(price || 0) });
+  const res = await fetch(`/api/history?${params.toString()}`);
+  if (!res.ok) throw new Error(`历史请求失败 HTTP ${res.status}`);
+  return res.json();
+}
+
 // 维度元数据（与后端 model.mjs 保持一致，用于初始化滑块与展示）
 export const DIMENSIONS = [
   { key: 'price', label: '价格', def: 8 },

@@ -21,6 +21,7 @@
       <input id="searchInput" type="search" placeholder="搜想买的东西，如：每日坚果 / 婴儿奶粉 / 维生素C / 蓝牙耳机" aria-label="搜索商品" />
       <button type="submit" id="searchBtn">比价</button>
     </form>
+    <button type="button" id="favBtn" class="fav-btn" aria-label="我的收藏">♥ 收藏 <span id="favCount">0</span></button>
   </header>
 
   <main class="layout">
@@ -84,6 +85,16 @@
         <button class="icon-btn" id="closeCompare" aria-label="关闭">✕</button>
       </div>
       <div class="modal-body" id="compareBody"></div>
+    </div>
+  </div>
+
+  <div id="favModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="我的收藏">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>我的收藏 &amp; 到价提醒</h2>
+        <button class="icon-btn" id="closeFav" aria-label="关闭">✕</button>
+      </div>
+      <div class="modal-body" id="favBody"></div>
     </div>
   </div>
 

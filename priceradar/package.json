@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node tests/test_currency.mjs && node tests/test_score.mjs && node tests/test_match.mjs && node tests/test_pipeline.mjs",
+    "test": "node tests/test_currency.mjs && node tests/test_score.mjs && node tests/test_match.mjs && node tests/test_pipeline.mjs && node tests/test_features.mjs && node tests/test_server.mjs",
     "test:frontend": "node tests/test_frontend.mjs",
     "test:all": "npm test && npm run test:frontend"
   },
