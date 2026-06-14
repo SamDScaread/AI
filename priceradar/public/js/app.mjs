@@ -169,13 +169,19 @@ function topReasons(offer, dims) {
 function renderMeta(result) {
   const live = result.meta.sources.filter((s) => s.mode === 'live');
   const okLive = live.filter((s) => s.ok);
-  const srcTxt = okLive.length
-    ? `<span class="src-ok">● 实时数据源 ${okLive.length} 个</span>`
-    : `<span class="src-fail">● 演示数据（未配置实时数据源）</span>`;
+  const ds = result.meta.dataSources || [];
+  const off = ds.includes('openfoodfacts');
+  const srcTxt = off
+    ? `<span class="src-ok">● 商品资料来自 Open Food Facts（真实）</span>`
+    : okLive.length
+      ? `<span class="src-ok">● 实时数据源 ${okLive.length} 个</span>`
+      : `<span class="src-fail">● 演示数据（未配置实时数据源）</span>`;
+  const simTxt = result.meta.priceSimulated ? `<span class="src-fail">⚠ 价格为模拟，接入电商联盟 API 后即实时</span>` : '';
   $('#resultMeta').innerHTML = `
     <span>共聚合 <b>${result.meta.totalListings}</b> 条商品，归并为 <b>${result.meta.productCount}</b> 款</span>
     <span>品类：${catLabel(result.category)}</span>
     ${srcTxt}
+    ${simTxt}
     <span>耗时 ${result.meta.elapsedMs} ms</span>`;
 }
 

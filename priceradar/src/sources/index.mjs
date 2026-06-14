@@ -7,11 +7,13 @@ import { mapLimit } from './base.mjs';
 import { DemoSource } from './demo.mjs';
 import { TaobaoSource } from './taobao.mjs';
 import { AmazonSource } from './amazon.mjs';
+import { OpenFoodFactsSource } from './openfoodfacts.mjs';
 
-// 真实平台适配器（未配置凭证时 search() 会抛错，被安全跳过）。
+// 真实平台适配器（未配置凭证/未启用时 search() 抛错或被禁用，安全跳过）。
 const LIVE_ADAPTERS = [
-  new TaobaoSource(),
-  new AmazonSource(),
+  new OpenFoodFactsSource(),   // 免 key 真实商品资料（PR_OFF=1 启用）
+  new TaobaoSource(),          // 淘宝联盟 API（配置凭证后启用）
+  new AmazonSource(),          // Amazon PA-API（配置凭证后启用）
   // 在此按需添加：new JdSource(), new PddSource(), new EbaySource() ...
 ];
 

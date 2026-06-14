@@ -90,6 +90,10 @@ export function makeListing(partial = {}) {
 
     shipping: partial.shipping || { feeCNY: 0, days: 0, damageRate: 0 },
 
+    // 数据来源溯源：dataSource=资料来源(如 openfoodfacts/demo)，priceSource=价格性质
+    dataSource: partial.dataSource || null,
+    priceSource: partial.priceSource || null,
+
     attributes: {
       origin: '',
       ingredients: [],          // 配料/原料表

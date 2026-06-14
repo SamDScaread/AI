@@ -71,6 +71,8 @@ export async function compare(query, opts = {}) {
       totalListings: listings.length,
       productCount: products.length,
       elapsedMs: Date.now() - started,
+      dataSources: [...new Set(listings.map((l) => l.dataSource).filter(Boolean))],
+      priceSimulated: listings.some((l) => l.priceSource === 'simulated'),
     },
     topPick: topListing ? { productKey: topListing.productKey, listingId: topListing.id, totalScore: topListing.totalScore } : null,
     products,
