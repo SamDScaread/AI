@@ -6,7 +6,7 @@
 //   2) 合成基线：演示阶段历史尚浅时，按 productKey 确定性合成一段 30 天走势，
 //      让曲线立刻有内容可看；真实快照会按日期覆盖合成点。
 
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -45,8 +45,16 @@ async function readAll() {
   }
 }
 
-/** 记录今日各产品的最优到手价（同 key 同日只留一条）。best-effort。 */
-export async function recordSnapshot(items) {
+// 串行化写入，避免并发 read-modify-write 互相覆盖/读到半截文件。
+let _writeChain = Promise.resolve();
+
+/** 记录今日各产品的最优到手价（同 key 同日只留一条）。best-effort、串行、原子写。 */
+export function recordSnapshot(items) {
+  _writeChain = _writeChain.then(() => _doRecord(items)).catch(() => false);
+  return _writeChain;
+}
+
+async function _doRecord(items) {
   try {
     const db = await readAll();
     const d = today();
@@ -66,7 +74,10 @@ export async function recordSnapshot(items) {
       while (keys.length && count > MAX_ENTRIES) { count -= (db[keys[0]]?.length || 0); delete db[keys.shift()]; }
     }
     await mkdir(DATA_DIR, { recursive: true });
-    await writeFile(FILE, JSON.stringify(db), 'utf8');
+    // 原子写：先写临时文件再 rename，避免读到半截内容
+    const tmp = `${FILE}.${process.pid}.tmp`;
+    await writeFile(tmp, JSON.stringify(db), 'utf8');
+    await rename(tmp, FILE);
     return true;
   } catch {
     return false; // 只读环境等：忽略

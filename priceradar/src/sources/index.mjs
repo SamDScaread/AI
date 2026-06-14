@@ -7,14 +7,18 @@ import { mapLimit } from './base.mjs';
 import { DemoSource } from './demo.mjs';
 import { TaobaoSource } from './taobao.mjs';
 import { AmazonSource } from './amazon.mjs';
+import { JdSource } from './jd.mjs';
+import { PddSource } from './pinduoduo.mjs';
 import { OpenFoodFactsSource } from './openfoodfacts.mjs';
 
 // 真实平台适配器（未配置凭证/未启用时 search() 抛错或被禁用，安全跳过）。
 const LIVE_ADAPTERS = [
   new OpenFoodFactsSource(),   // 免 key 真实商品资料（PR_OFF=1 启用）
-  new TaobaoSource(),          // 淘宝联盟 API（配置凭证后启用）
-  new AmazonSource(),          // Amazon PA-API（配置凭证后启用）
-  // 在此按需添加：new JdSource(), new PddSource(), new EbaySource() ...
+  new TaobaoSource(),          // 淘宝联盟 API（TAOBAO_APP_KEY/SECRET）
+  new JdSource(),              // 京东联盟 API（JD_APP_KEY/JD_SECRET_KEY）
+  new PddSource(),             // 拼多多·多多进宝（PDD_CLIENT_ID/SECRET）
+  new AmazonSource(),          // Amazon Creators API（AMAZON_CLIENT_ID/SECRET/PARTNER_TAG）
+  // 在此按需添加：new EbaySource(), new AliExpressSource() ...
 ];
 
 const demo = new DemoSource();

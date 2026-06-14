@@ -132,17 +132,23 @@ priceradar/
 为**模拟**并在界面标注（接入下方电商联盟 API 后替换为真实价）。这条范例打通了「实时取数 →
 解析 → 归一化 → 归并 → 打分」的真实链路。
 
-1. **推荐路径（联盟/官方 API）**
-   - 淘宝/天猫：开通**淘宝联盟（淘宝客）**，在 `src/sources/taobao.mjs` 的 `searchViaAffiliate()`
-     里实现 TOP 网关签名与解析；凭证经 `TAOBAO_APP_KEY/SECRET` 环境变量注入。
-   - 京东：京东联盟 API；拼多多：多多进宝 API；同理各建一个 `SourceAdapter` 子类。
-   - Amazon：开通 **Associate** 并申请 **PA-API 5.0**，在 `src/sources/amazon.mjs` 的
-     `searchViaPAAPI()` 里实现 AWS V4 签名与解析；凭证经 `AMAZON_ACCESS_KEY/SECRET/PARTNER_TAG`。
-   - eBay：Browse/Finding API；Walmart / AliExpress：各自开放平台。
-2. **研究用路径（H5 解析）**：`base.mjs` 已提供 `fetchHtml/fetchWithRetry/throttle/randomUA`；
-   在子类里解析页面内嵌 JSON 即可。请务必低频、合规。
-3. 在 `src/sources/index.mjs` 的 `LIVE_ADAPTERS` 注册你的适配器。**未配置凭证的适配器会被
-   安全跳过**，演示源兜底，保证 App 始终可用；一旦某平台返回真实数据，就自动用真实数据。
+> 📄 **怎么申请各平台 key？** 见 [`docs/获取API凭证-最简步骤.md`](docs/获取API凭证-最简步骤.md)（一步步该去哪、点哪）。
+
+**适配器骨架已就位（含真实签名/鉴权，填 key 即用）**，凭证均经环境变量注入，未配置者安全跳过：
+
+| 平台 | 适配器 | 环境变量 | 鉴权 |
+|---|---|---|---|
+| 淘宝/天猫 | `taobao.mjs` | `TAOBAO_APP_KEY` / `TAOBAO_APP_SECRET` | TOP 签名（待补） |
+| 京东联盟 | `jd.mjs` | `JD_APP_KEY` / `JD_SECRET_KEY` / `JD_SITE_ID?` | **MD5 签名（已实现）** |
+| 拼多多·多多进宝 | `pinduoduo.mjs` | `PDD_CLIENT_ID` / `PDD_CLIENT_SECRET` / `PDD_PID?` | **MD5 签名（已实现）** |
+| Amazon | `amazon.mjs` | `AMAZON_CLIENT_ID` / `AMAZON_CLIENT_SECRET` / `AMAZON_PARTNER_TAG` | **Creators API OAuth2（已实现）** |
+
+> ⚠️ Amazon 旧 **PA-API v5 已于 2026-04-30 弃用、05-15 关停**，本项目已改用新版 **Creators API**。
+
+**研究用路径（H5 解析）**：`base.mjs` 提供 `fetchHtml/fetchWithRetry/throttle/randomUA`，在子类里
+解析页面内嵌 JSON 即可，请务必低频、合规。所有适配器在 `src/sources/index.mjs` 的 `LIVE_ADAPTERS`
+注册；**未配置凭证者自动跳过、演示源兜底**，一旦某平台返回真实数据就自动启用。各适配器只需把
+平台字段映射成 `mapItem()` 的「半成品」，`normalize.mjs` 负责折汇率/算单位价/生成归并键，后续全自动。
 
 每个适配器只需把平台原始字段映射成 `mapItem()` 里那套「半成品」字段，`normalize.mjs`
 会负责折汇率、算单位价、生成归并键，后续打分排序全自动。
