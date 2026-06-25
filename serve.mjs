@@ -29,5 +29,6 @@ createServer(async (req, res) => {
     res.end('404 Not Found');
   }
 }).listen(PORT, () => {
-  console.log(`\n  侠盗猎码 Grand Theft Code is live →  http://localhost:${PORT}\n`);
+  console.log(`\n  侠盗猎码 Grand Theft Code is live →  http://localhost:${PORT}`);
+  console.log(`  深空轮盘 Deep-Space Standoff   →  http://localhost:${PORT}/deepspace.html\n`);
 });
