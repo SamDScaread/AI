@@ -1,0 +1,12 @@
+{
+  "name": "multiplayer-game-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "零依赖的实时多人游戏服务器骨架（手写 WebSocket）。Dependency-free realtime multiplayer game server skeleton.",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node test/test_server.mjs && node test/test_ws_smoke.mjs"
+  },
+  "license": "MIT"
+}
