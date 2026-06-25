@@ -179,9 +179,9 @@ function fire(state, shooterId, target, events) {
   }
   state.buff[shooterId] = 1; // 过载芯只作用这一枪
   events.push({
-    kind: 'shoot', by: nameOf(state, shooterId), target,
+    kind: 'shoot', by: nameOf(state, shooterId), byId: shooterId, target,
     shell: isLive ? 'live' : 'blank', damage,
-    victim: nameOf(state, victimId), hp: { ...state.hp },
+    victim: nameOf(state, victimId), victimId, hp: { ...state.hp },
   });
   return { isLive, keepTurn: target === 'self' && !isLive, victimId };
 }

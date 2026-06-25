@@ -4,7 +4,7 @@
 import { createWsServer } from './lib/ws.mjs';
 import { RoomManager } from './lib/rooms.mjs';
 import { attach } from './lib/engine.mjs';
-import game from './games/nim.mjs'; // ← 换玩法时只改这一行
+import game from './games/deepspace.mjs'; // ← 换玩法时只改这一行
 
 const PORT = process.env.PORT || 3001;
 const manager = new RoomManager(game);

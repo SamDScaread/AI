@@ -2,7 +2,8 @@
 // 负责：标题闸门 -> 首次进入自动播放[背景故事动画]+[新手教程]；主菜单路由
 // （练习/联机(占位)/故事/教程/鸣谢/反馈/退出）；过场动画引擎；新手弹窗引导；mailto 反馈。
 // 实际对局/3D/音效由 deepspace-3d.mjs 提供，这里只做编排。
-import { initGame, startMatch, audio, setReturnHandler } from '/js/deepspace-3d.mjs';
+import { initGame, startMatch, audio, setReturnHandler, setStoryCam } from '/js/deepspace-3d.mjs';
+import { openOnline, bootOnline } from '/js/deepspace-online.mjs';
 
 const HUMAN = 'you';
 const $ = (id) => document.getElementById(id);
@@ -12,9 +13,11 @@ const FEEDBACK_TO = 'samscaread@gmail.com';
 function waitOrSkip(ms, skipped) {
   return new Promise((res) => { let e = 0; const id = setInterval(() => { e += 80; if (e >= ms || skipped()) { clearInterval(id); res(); } }, 80); });
 }
-async function cine(beats) {
+async function cine(beats, opts = {}) {
   const ov = $('cinematic'), txt = $('cineText'), skip = $('cineSkip');
   let skipped = false; skip.onclick = () => { skipped = true; };
+  if (opts.cam) setStoryCam(true);        // 3D 场景进入电影运镜
+  $('cineRain').hidden = !opts.rain;      // 雨丝氛围层
   ov.hidden = false;
   for (const b of beats) {
     if (skipped) break;
@@ -26,6 +29,8 @@ async function cine(beats) {
     await waitOrSkip(260, () => skipped);
   }
   ov.hidden = true; ov.className = 'overlay cine';
+  $('cineRain').hidden = true;
+  if (opts.cam) setStoryCam(false);
 }
 
 const STORY = [
@@ -74,14 +79,14 @@ function showCoach(text, onOk) {
 // ---- 路由 ----
 function showMenu() { hideAllOverlays(); $('menu').hidden = false; }
 function hideAllOverlays() {
-  ['menu', 'feedbackScreen', 'exitScreen', 'coach', 'cinematic', 'startScreen'].forEach((id) => { $(id).hidden = true; });
+  ['menu', 'feedbackScreen', 'exitScreen', 'coach', 'cinematic', 'startScreen', 'onlineScreen'].forEach((id) => { $(id).hidden = true; });
 }
 
 function startPractice() { $('menu').hidden = true; startMatch({}); }
 function startTutorial() { $('menu').hidden = true; startMatch({ dumb: true, onStep: makeTutorial() }); }
 
-async function playStory() { $('menu').hidden = true; await cine(STORY); }
-async function playCredits() { $('menu').hidden = true; await cine(CREDITS); }
+async function playStory() { $('menu').hidden = true; await cine(STORY, { cam: true, rain: true }); }
+async function playCredits() { $('menu').hidden = true; await cine(CREDITS, { cam: true }); }
 
 function openFeedback() {
   hideAllOverlays(); $('feedbackScreen').hidden = false; $('fbText').value = '';
@@ -113,10 +118,11 @@ async function enter() {
 
 function boot() {
   initGame();                  // 构建 3D 场景（作为菜单背景），接好对局内按钮
+  bootOnline();                // 接好联机大厅按钮
   setReturnHandler(showMenu);  // 对局结束/退出 -> 回主菜单
   $('enterBtn').onclick = enter;
   $('mPractice').onclick = startPractice;
-  $('mOnline').onclick = () => showCoach('联机模式正在开发中——很快就能和真人对赌。敬请期待。');
+  $('mOnline').onclick = () => openOnline(showMenu);
   $('mStory').onclick = async () => { await playStory(); showMenu(); };
   $('mTutorial').onclick = startTutorial;
   $('mCredits').onclick = async () => { await playCredits(); showMenu(); };

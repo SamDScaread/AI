@@ -170,7 +170,7 @@ function buildScene() {
 
   S.shakeT = 0; S.shakeMag = 0; S.gunYaw = 0; S.gunYawTarget = 0; S.gunLift = 0;
   S.muzzleT = 0; S.flinch = { you: 0, ai: 0 }; S.turn = null;
-  S.zoom = 0; S.zoomTarget = 0; S.slowmo = false; S.nextGlitch = 5;
+  S.zoom = 0; S.zoomTarget = 0; S.slowmo = false; S.nextGlitch = 5; S.storyCam = false;
 
   clock = new THREE.Clock();
   resize(); window.addEventListener('resize', resize);
@@ -227,6 +227,15 @@ function loop() {
   // 偶发屏幕故障
   S.nextGlitch -= dt; if (S.nextGlitch <= 0) { glitch(); S.nextGlitch = 4 + Math.random() * 6; }
 
+  // 背景故事/鸣谢的电影运镜：镜头在气闸厅里缓缓游移
+  if (S.storyCam) {
+    camera.position.set(Math.sin(t * 0.13) * 4.4, 3.0 + Math.sin(t * 0.09) * 0.8, 9.0 + Math.cos(t * 0.11) * 2.4);
+    camera.fov = 44; camera.updateProjectionMatrix();
+    camera.lookAt(0, 1.7, 0);
+    renderer.render(scene, camera);
+    return;
+  }
+
   // 慢动作推镜 + 抖动
   S.zoom += (S.zoomTarget - S.zoom) * Math.min(1, dt * 6);
   let ox = 0, oy = 0;
@@ -264,13 +273,13 @@ function update3D(v) {
   }
 }
 
-function aimGun(victimId) {
-  S.gunYawTarget = (victimId === HUMAN ? YOU_X : AI_X) < 0 ? Math.PI : 0;
+// side: 'you'(左) | 'ai'(右)
+function aimGun(side) {
+  S.gunYawTarget = side === 'you' ? Math.PI : 0; // 枪管(+x)指向目标方
   S.gunLift = 0.22;
 }
-function muzzleFlash(live, victimId) {
-  const x = victimId === HUMAN ? YOU_X : AI_X;
-  S.muzzle.position.set(x < 0 ? -0.7 : 0.7, 1.18, 0.3);
+function muzzleFlash(live, side) {
+  S.muzzle.position.set(side === 'you' ? -0.7 : 0.7, 1.18, 0.3);
   S.muzzle.scale.setScalar(live ? 1.3 : 0.6);
   S.muzzle.material.emissive.setHex(live ? 0xff5522 : 0x66aacc);
   S.flashL.color.setHex(live ? 0xff3b3b : 0x2fb9c4);
@@ -278,8 +287,8 @@ function muzzleFlash(live, victimId) {
 }
 function camShake(mag) { S.shakeT = 0.4; S.shakeMag = mag; }
 
-function spawnBlood(victimId) {
-  const fig = victimId === HUMAN ? S.you : S.ai;
+function spawnBlood(side) {
+  const fig = side === 'you' ? S.you : S.ai;
   const dir = fig.position.x < 0 ? -1 : 1;
   let n = 0;
   for (const p of S.blood) {
@@ -291,10 +300,9 @@ function spawnBlood(victimId) {
   }
 }
 
-// 慢动作：开枪前推镜 + 抖动 + 加速心跳（<1 秒）
-async function preShot(shooterId, target) {
-  const victim = target === 'self' ? shooterId : (shooterId === HUMAN ? AI : HUMAN);
-  aimGun(victim);
+// 慢动作：开枪前推镜 + 抖动 + 加速心跳（<1 秒）。victimSide: 'you'|'ai'
+async function preShot(victimSide) {
+  aimGun(victimSide);
   S.zoomTarget = 1; S.slowmo = true;
   $('app').classList.add('slowmo');
   audio.setTension(0.98);
@@ -317,6 +325,8 @@ function glitch() { const g = $('glitch'); g.classList.remove('on'); void g.offs
 let state = null, aiBusy = false, lastEnd = null;
 // 由菜单/教程注入的可调项
 let aiDecide = decideAction, aiMercyFn = decideMercy, afterStepHook = null, onReturnToMenu = null, curOpts = {};
+// 联机状态：online=true 时渲染由服务器回传的视图/事件驱动；lastView 是当前渲染所用视图。
+let lastView = null, online = false, net = null, netMe = null, netOpp = null;
 const viewHuman = () => game.viewFor(state, HUMAN);
 const viewAi = () => game.viewFor(state, AI);
 
@@ -334,7 +344,7 @@ function applyStep(id, action) {
   try { res = game.applyAction(state, id, action); } catch { return false; }
   state = res.state;
   for (const ev of res.events) handleEvent(ev);
-  render();
+  render(viewHuman());
   if (afterStepHook) afterStepHook(viewHuman(), res.events); // 教程引导钩子
   return true;
 }
@@ -345,11 +355,25 @@ async function humanAct(action) {
   if (v.turnId !== HUMAN || (state.phase !== 'duel' && state.phase !== 'mercy_duel')) return;
   if (action.type === 'shoot') {
     aiBusy = true; setControls(false);
-    await preShot(HUMAN, action.target);
+    await preShot(action.target === 'self' ? 'you' : 'ai');
     aiBusy = false;
     applyStep(HUMAN, action);
   } else applyStep(HUMAN, action);
   sync();
+}
+
+// 统一的玩家操作入口：联机时发往服务器（效果由回传事件驱动），单机走本地逻辑。
+function playerAct(action) {
+  if (online) {
+    if (!lastView || lastView.turnId !== 'you' || (lastView.phase !== 'duel' && lastView.phase !== 'mercy_duel')) return;
+    setControls(false);
+    net.action(action);
+  } else humanAct(action);
+}
+function chooseMercy(choice) {
+  hideOverlays();
+  if (online) net.action({ type: 'mercy', choice });
+  else { applyStep(HUMAN, { type: 'mercy', choice }); sync(); }
 }
 
 async function runAi() {
@@ -366,7 +390,7 @@ async function runAi() {
       $('hint').textContent = '仲裁者正在权衡……';
       await delay(620 + Math.random() * 600);
       const action = aiDecide(viewAi());
-      if (action.type === 'shoot') await preShot(AI, action.target);
+      if (action.type === 'shoot') await preShot(action.target === 'self' ? 'ai' : 'you');
       applyStep(AI, action);
       await delay(200);
     }
@@ -374,7 +398,7 @@ async function runAi() {
 }
 
 function sync() {
-  render();
+  render(viewHuman());
   if (state.phase === 'finished') return showEnd();
   if (state.phase === 'mercy_choice') {
     if (state.matchWinnerId === HUMAN) return showMercy();
@@ -387,8 +411,8 @@ function sync() {
 }
 
 // ============================================================ 渲染（HUD + 3D）
-function render() {
-  const v = viewHuman();
+function render(v) {
+  lastView = v;
   const tag = v.phase === 'mercy_duel' ? '怜悯决战'
     : v.matchRound === 3 ? '决胜局' : `第 ${'一二三'[v.matchRound - 1]} 局`;
   const rt = $('roundTag'); rt.textContent = tag;
@@ -418,8 +442,9 @@ function renderFighter(elId, v, id, isYou) {
   const items = (v.items[id] || []).map((it) => {
     const m = ITEM_META[it]; return `<div class="item"><span class="ic">${m.icon}</span>${m.label}</div>`;
   }).join('') || '<span class="empty">无道具</span>';
+  const nm = (v._names && v._names[id]) || (id === HUMAN ? '你' : '仲裁者');
   el.innerHTML = `
-    <div class="who"><span class="nm">${id === HUMAN ? '你' : '仲裁者'}</span>
+    <div class="who"><span class="nm">${nm}</span>
       <span class="tag">${isYou ? 'EDGERUNNER' : 'ARBITER'}</span></div>
     <div class="hp">${cells}</div>
     <div class="items">${items}</div>`;
@@ -427,6 +452,7 @@ function renderFighter(elId, v, id, isYou) {
 
 function renderItemBar(v) {
   const bar = $('itemBar');
+  if (!v) { bar.innerHTML = ''; return; }
   const inv = v.items[HUMAN] || [];
   const yourTurn = v.turnId === HUMAN && (v.phase === 'duel' || v.phase === 'mercy_duel') && !aiBusy;
   if (!inv.length) { bar.innerHTML = ''; return; }
@@ -434,13 +460,13 @@ function renderItemBar(v) {
     const m = ITEM_META[it];
     return `<div class="item ${yourTurn ? 'usable' : ''}" data-item="${it}" title="${m.desc}"><span class="ic">${m.icon}</span>${m.label}</div>`;
   }).join('');
-  if (yourTurn) bar.querySelectorAll('.item').forEach((n) => { n.onclick = () => humanAct({ type: 'item', item: n.dataset.item }); });
+  if (yourTurn) bar.querySelectorAll('.item').forEach((n) => { n.onclick = () => playerAct({ type: 'item', item: n.dataset.item }); });
 }
 
 function setControls(enabled) {
   $('controls').setAttribute('aria-disabled', String(!enabled));
   $('shootSelf').disabled = !enabled; $('shootOpp').disabled = !enabled;
-  renderItemBar(viewHuman());
+  renderItemBar(lastView);
 }
 
 // ============================================================ 事件 -> 音 + 3D + 日志
@@ -449,17 +475,17 @@ function handleEvent(ev) {
     case 'shoot': {
       const live = ev.shell === 'live';
       const tgt = ev.target === 'self' ? '自己' : '对手';
-      const shooter = NAME[ev.by];
-      const victim = ev.target === 'self' ? shooter : (shooter === HUMAN ? AI : HUMAN);
-      aimGun(victim); muzzleFlash(live, victim);
+      const vSide = ev.victimId === HUMAN ? 'you' : 'ai'; // byId/victimId 已是 'you'/'ai'（联机时已重映射）
+      const sSide = ev.byId === HUMAN ? 'you' : 'ai';
+      aimGun(vSide); muzzleFlash(live, vSide);
       if (live) {
-        audio.bang(); audio.hit(); camShake(0.9); flash('hit'); S.flinch[victim] = 0.3; spawnBlood(victim);
-        if (victim === HUMAN) injury();
-        log(`${ev.by} 抵住${tgt}扣下扳机 —— 实弹炸响，命中${victim === HUMAN ? '你' : '对手'}！`, 'live');
+        audio.bang(); audio.hit(); camShake(0.9); flash('hit'); S.flinch[vSide] = 0.3; spawnBlood(vSide);
+        if (vSide === 'you') injury();
+        log(`${ev.by} 抵住${tgt}扣下扳机 —— 实弹炸响，命中${vSide === 'you' ? '你' : '对手'}！`, 'live');
       } else {
         audio.click(); camShake(0.18); flash('blank');
-        if (victim === HUMAN) audio.sigh('relief');         // 空枪没打中自己 -> 长舒一口气
-        else if (shooter === HUMAN) audio.sigh('light');    // 你空枪打对手 -> 轻叹
+        if (vSide === 'you') audio.sigh('relief');          // 空枪没打中自己 -> 长舒一口气
+        else if (sSide === 'you') audio.sigh('light');      // 你空枪打对手 -> 轻叹
         log(`${ev.by} 抵住${tgt}扣下扳机 —— 空响。`, '');
       }
       break;
@@ -484,7 +510,7 @@ function logItem(ev) {
 }
 
 function tension() {
-  const v = viewHuman();
+  const v = lastView; if (!v) return 0.3;
   const minHp = Math.min(v.hp[HUMAN], v.hp[AI]);
   const tot = Math.max(1, v.mag.liveLeft + v.mag.blankLeft);
   const boost = v.phase === 'mercy_duel' ? 0.35 : v.matchRound >= 3 ? 0.2 : 0;
@@ -509,40 +535,97 @@ function showMercy() {
 }
 function showEnd() {
   setControls(false);
-  const v = viewHuman(), won = v.winnerId === HUMAN, credits = v.credits[HUMAN], via = lastEnd && lastEnd.viaMercy;
+  const v = lastView, won = v.winnerId === HUMAN, credits = v.credits[HUMAN], via = lastEnd && lastEnd.viaMercy;
   let flavor;
   if (won && via) flavor = '你赦免了它，又亲手了结了它。γ-7 的氧气，今夜归你。';
-  else if (!won && via) flavor = '怜悯是你最后的傲慢。仲裁者从绝境里爬起，按下了扳机。';
+  else if (!won && via) flavor = '怜悯是你最后的傲慢。对手从绝境里爬起，按下了扳机。';
   else if (won) flavor = '舱门嘶鸣着打开。你踏过冷却的枪管，走向下一段黑暗。';
-  else flavor = '红光熄灭。站务核心记录：囚徒编号已注销。';
+  else flavor = '红光熄灭。站务核心记录：编号已注销。';
+  const buttons = online
+    ? `<button class="grant" id="toMenuBtn">返回主菜单</button>`
+    : `<button class="grant" id="againBtn">再入气闸</button><button id="toMenuBtn">返回主菜单</button>`;
   $('endScreen').innerHTML = `
     <div class="verdict ${won ? 'win' : 'lose'}">${won ? '你 活 着' : '你 死 在 了 这 里'}</div>
     <div class="credits-line">结算信用点：<b>${credits >= 0 ? '+' : ''}${credits}</b>${via ? '（怜悯豪赌）' : ''}</div>
     <div class="flavor">${flavor}</div>
-    <div class="mercy-actions">
-      <button class="grant" id="againBtn">再入气闸</button>
-      <button id="toMenuBtn">返回主菜单</button>
-    </div>`;
+    <div class="mercy-actions">${buttons}</div>`;
   $('endScreen').hidden = false;
-  $('againBtn').onclick = () => { hideOverlays(); startMatch(curOpts); };
-  $('toMenuBtn').onclick = () => { hideOverlays(); $('hud').hidden = true; if (onReturnToMenu) onReturnToMenu(); };
+  if (!online) $('againBtn').onclick = () => { hideOverlays(); startMatch(curOpts); };
+  $('toMenuBtn').onclick = () => { hideOverlays(); $('hud').hidden = true; if (online) leaveOnline(); if (onReturnToMenu) onReturnToMenu(); };
+}
+
+// ============================================================ 联机模式
+function nameById(view, id) { const p = (view.players || []).find((x) => x.id === id); return p ? p.name : String(id); }
+// 把服务器视角(数字 id)重映射成本地的 you/ai，从而复用同一套渲染。
+function remapView(view) {
+  const me = view.you, op = view.opponent;
+  const M = (id) => (id === me ? 'you' : id === op ? 'ai' : id);
+  const pick = (o) => ({ you: o ? o[me] : undefined, ai: o ? o[op] : undefined });
+  return {
+    ...view, you: 'you', opponent: 'ai',
+    hp: pick(view.hp), roundWins: pick(view.roundWins), credits: pick(view.credits),
+    items: { you: (view.items && view.items[me]) || [], ai: (view.items && view.items[op]) || [] },
+    skipNext: pick(view.skipNext), buff: pick(view.buff),
+    turnId: view.turnId != null ? M(view.turnId) : null,
+    mercyChoiceFor: view.mercyChoiceFor != null ? M(view.mercyChoiceFor) : null,
+    winnerId: view.winnerId != null ? M(view.winnerId) : null,
+    _names: { you: nameById(view, me), ai: nameById(view, op) },
+  };
+}
+function remapEvent(ev) {
+  const M = (id) => (id === netMe ? 'you' : id === netOpp ? 'ai' : id);
+  const e = { ...ev };
+  if (e.byId != null) e.byId = M(e.byId);
+  if (e.victimId != null) e.victimId = M(e.victimId);
+  if (e.winnerId != null) e.winnerId = M(e.winnerId);
+  return e;
+}
+
+export function startOnline({ client, myId, onFirstState }) {
+  online = true; net = client; netMe = myId; netOpp = null;
+  lastView = null; lastEnd = null; logLines = [];
+  let firstState = true;
+  let q = Promise.resolve();
+  const enq = (fn) => { q = q.then(fn).catch((e) => console.error(e)); };
+  client.on('state', (m) => enq(async () => {
+    if (firstState) { firstState = false; $('log').innerHTML = ''; $('hud').hidden = false; if (onFirstState) onFirstState(); }
+    netMe = m.view.you; netOpp = m.view.opponent; const v = remapView(m.view); render(v); onlineControls(v);
+  }));
+  client.on('event', (m) => enq(async () => { const ev = remapEvent(m.event); if (ev.kind === 'shoot') await preShot(ev.victimId === 'you' ? 'you' : 'ai'); handleEvent(ev); }));
+  client.on('over', (m) => enq(async () => { netMe = m.view.you; netOpp = m.view.opponent; render(remapView(m.view)); showEnd(); }));
+  client.on('disconnected', () => { if (online) { online = false; $('hud').hidden = true; hideOverlays(); if (onReturnToMenu) onReturnToMenu(); } });
+}
+export function leaveOnline() { if (net) { try { net.leave(); net.disconnect(); } catch { /* ignore */ } } online = false; net = null; }
+
+function onlineControls(v) {
+  if (v.phase === 'finished') return;
+  if (v.phase === 'mercy_choice') {
+    if (v.mercyChoiceFor === 'you') showMercy();
+    else { hideOverlays(); setControls(false); $('hint').textContent = '对手正在决定是否怜悯你……'; }
+    return;
+  }
+  hideOverlays();
+  const myTurn = v.turnId === 'you' && (v.phase === 'duel' || v.phase === 'mercy_duel');
+  setControls(myTurn);
+  $('hint').textContent = myTurn ? '轮到你 —— 抵住自己赌一把，或瞄准对手。' : '等待对手行动……';
 }
 
 // ============================================================ 对外 API（供菜单/教程驱动）
 export { audio };
 export function setReturnHandler(fn) { onReturnToMenu = fn; }
+export function setStoryCam(on) { if (S) S.storyCam = !!on; } // 背景故事/鸣谢时的电影运镜开关
 
 export function initGame() {
   buildScene();
-  $('shootSelf').onclick = () => humanAct({ type: 'shoot', target: 'self' });
-  $('shootOpp').onclick = () => humanAct({ type: 'shoot', target: 'opponent' });
-  $('mercyGrant').onclick = () => { hideOverlays(); applyStep(HUMAN, { type: 'mercy', choice: 'grant' }); sync(); };
-  $('mercyExec').onclick = () => { hideOverlays(); applyStep(HUMAN, { type: 'mercy', choice: 'decline' }); sync(); };
+  $('shootSelf').onclick = () => playerAct({ type: 'shoot', target: 'self' });
+  $('shootOpp').onclick = () => playerAct({ type: 'shoot', target: 'opponent' });
+  $('mercyGrant').onclick = () => chooseMercy('grant');
+  $('mercyExec').onclick = () => chooseMercy('decline');
 }
 
-// opts: { dumb?:bool, onStep?:(view,events)=>void }
+// opts: { dumb?:bool, onStep?:(view,events)=>void }  —— 启动一局单机对局
 export function startMatch(opts = {}) {
-  curOpts = opts;
+  online = false; net = null; curOpts = opts;
   aiDecide = opts.dumb ? decideActionDumb : decideAction;
   aiMercyFn = opts.dumb ? () => 'decline' : decideMercy;
   afterStepHook = opts.onStep || null;
