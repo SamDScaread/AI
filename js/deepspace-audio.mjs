@@ -117,4 +117,28 @@ export class AudioKit {
       o.connect(lp).connect(g).connect(this.master); o.start(t); o.stop(t + 1.5);
     });
   }
+  hit() { // 实弹命中血肉的湿闷撞击
+    if (!this.on) return; const t = this.ctx.currentTime;
+    const o = this.ctx.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(48, t + 0.12);
+    const g = this.ctx.createGain(); g.gain.setValueAtTime(0.55, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+    o.connect(g).connect(this.master); o.start(t); o.stop(t + 0.22);
+    const n = this.ctx.createBufferSource(); n.buffer = this._noise;
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 480;
+    const ng = this.ctx.createGain(); ng.gain.setValueAtTime(0.4, t); ng.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+    n.connect(lp).connect(ng).connect(this.master); n.start(t); n.stop(t + 0.14);
+  }
+  sigh(kind) { // 主角呼吸：light=空枪打对方轻叹；relief=空枪没打中自己长舒一口气
+    if (!this.on) return; const t = this.ctx.currentTime;
+    const long = kind === 'relief'; const dur = long ? 0.95 : 0.42;
+    const n = this.ctx.createBufferSource(); n.buffer = this._noise; n.loop = true;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 0.7;
+    bp.frequency.setValueAtTime(long ? 880 : 1080, t);
+    bp.frequency.exponentialRampToValueAtTime(long ? 380 : 640, t + dur); // 频率下滑 = 呼气
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(long ? 0.09 : 0.055, t + dur * 0.3);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    n.connect(bp).connect(g).connect(this.master); n.start(t); n.stop(t + dur + 0.05);
+  }
 }

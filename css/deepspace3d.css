@@ -37,8 +37,9 @@
   background: linear-gradient(180deg, rgba(10,14,22,.78), rgba(5,7,12,.7));
   border: 1px solid var(--edge); padding: 12px 16px; backdrop-filter: blur(3px);
 }
-#oppPanel { top: 56px; left: 22px; }
-#youPanel { top: 56px; right: 22px; }
+/* 面板与各自的 3D 角色同侧：你(雇佣兵)在左、仲裁者在右 */
+#youPanel { top: 56px; left: 22px; }
+#oppPanel { top: 56px; right: 22px; }
 #hud .fighter.turn { border-color: var(--red); box-shadow: 0 0 22px var(--glow-r); }
 #hud .fighter.opp.turn { border-color: var(--cyan); box-shadow: 0 0 22px var(--glow-c); }
 
@@ -59,3 +60,28 @@
   #hud .fighter { width: 46vw; }
   #oppPanel { top: 50px; }
 }
+
+/* ---- 战斗特效层 ---- */
+/* 慢动作：仅给 3D 画面调色，HUD 保持清晰 */
+#app.slowmo #stage canvas { filter: contrast(1.25) saturate(0.5) brightness(0.85); }
+#stage canvas { transition: filter 0.25s ease; }
+
+/* 受伤黑屏 */
+#blackout { position: fixed; inset: 0; z-index: 56; background: #000; opacity: 0; pointer-events: none; transition: opacity 0.45s ease; }
+#blackout.on { opacity: 0.92; transition: opacity 0.04s ease; }
+
+/* 血雾：随紧张度升高的红色弥散，由 JS 控制 opacity */
+#mist { position: fixed; inset: 0; z-index: 2; pointer-events: none; opacity: 0;
+  background: radial-gradient(70% 55% at 50% 62%, rgba(226,48,74,0.55), transparent 72%);
+  mix-blend-mode: screen; transition: opacity 0.6s ease; }
+
+/* 屏幕故障：RGB 撕裂条纹 */
+#glitch { position: fixed; inset: 0; z-index: 53; pointer-events: none; opacity: 0; }
+#glitch.on {
+  opacity: 1; mix-blend-mode: screen;
+  background:
+    repeating-linear-gradient(0deg, rgba(47,185,196,0.12) 0 2px, transparent 2px 5px),
+    linear-gradient(90deg, rgba(226,48,74,0.10), transparent 40%);
+  animation: glitchShift 0.22s steps(2);
+}
+@keyframes glitchShift { 0% { transform: translateX(-4px); } 50% { transform: translateX(5px); } 100% { transform: translateX(0); } }
