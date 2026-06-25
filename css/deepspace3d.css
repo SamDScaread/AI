@@ -85,3 +85,44 @@
   animation: glitchShift 0.22s steps(2);
 }
 @keyframes glitchShift { 0% { transform: translateX(-4px); } 50% { transform: translateX(5px); } 100% { transform: translateX(0); } }
+
+/* ---- 主菜单 ---- */
+.menu-title { font-size: clamp(30px, 7vw, 64px); }
+.menu-list { display: flex; flex-direction: column; gap: 12px; margin-top: 4vh; width: min(340px, 82vw); }
+.menu-list button { width: 100%; padding: 1em 1.2em; font-size: 14px; }
+.menu-list .soon { opacity: 0.5; border-style: dashed; }
+
+/* ---- 过场动画（背景故事 / 鸣谢） ---- */
+.cine { background: radial-gradient(80% 60% at 50% 45%, rgba(8,11,18,0.92), rgba(2,3,6,0.99)); }
+.cine.city { background: radial-gradient(85% 75% at 50% 82%, rgba(10,42,50,0.55), rgba(2,3,6,0.99) 62%); }
+.cine.danger { background: radial-gradient(80% 60% at 50% 45%, rgba(44,8,14,0.6), rgba(2,3,6,0.99)); }
+.cine-text {
+  max-width: 780px; padding: 0 8vw; text-align: center;
+  font-size: clamp(20px, 4vw, 38px); line-height: 1.7; letter-spacing: 0.08em; color: var(--bone);
+  text-shadow: 0 0 16px rgba(0,0,0,0.9);
+  opacity: 0; transform: translateY(14px); transition: opacity 0.8s ease, transform 0.8s ease;
+}
+.cine-text.show { opacity: 1; transform: translateY(0); }
+.cine.city .cine-text { color: #c2ecf1; text-shadow: 0 0 18px var(--glow-c); }
+.cine.danger .cine-text { color: #ffd2d8; text-shadow: 0 0 18px var(--glow-r); }
+.cine.title .cine-text { font-size: clamp(34px, 8vw, 72px); letter-spacing: 0.18em; text-shadow: 0 0 22px var(--glow-r); }
+.cine-skip { position: fixed; right: 24px; bottom: 22px; font-size: 12px; }
+
+/* ---- 反馈 ---- */
+.fb-text {
+  width: min(560px, 84vw); height: 30vh; margin-top: 1.2em; padding: 14px; resize: none; outline: none;
+  background: #0a0e15; color: var(--ink); border: 1px solid var(--edge);
+  font-family: inherit; font-size: 14px; letter-spacing: 0.03em; line-height: 1.6;
+}
+.fb-text:focus { border-color: var(--cyan); box-shadow: 0 0 12px var(--glow-c); }
+
+/* ---- 新手引导弹窗 ---- */
+.coach {
+  position: fixed; z-index: 45; top: 16%; left: 50%; transform: translateX(-50%);
+  width: min(560px, 88vw); padding: 18px 20px; pointer-events: auto;
+  background: linear-gradient(180deg, rgba(14,18,26,0.97), rgba(7,9,14,0.97));
+  border: 1px solid var(--amber); box-shadow: 0 0 26px rgba(207,154,59,0.3);
+}
+.coach[hidden] { display: none; }
+.coach-text { color: var(--ink); font-size: 14px; line-height: 1.85; letter-spacing: 0.03em; }
+.coach-ok { margin-top: 14px; border-color: var(--amber); color: var(--amber); }

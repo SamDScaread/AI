@@ -51,3 +51,12 @@ export function decideMercy(view) {
   const oppWins = view.roundWins[view.opponent];
   return myWins >= 2 && oppWins === 0 ? 'grant' : 'decline';
 }
+
+// 「笨 AI」：新手教程专用的好对付对手。从不用道具、从不扫描；弹序未知时大概率朝自己开枪
+// （经常把实弹送给自己），只在已知时才做合理反应。容易被新手打赢。
+export function decideActionDumb(view) {
+  const known = view.currentShell;
+  if (known === 'blank') return { type: 'shoot', target: 'self' };
+  if (known === 'live') return { type: 'shoot', target: 'opponent' };
+  return Math.random() < 0.7 ? { type: 'shoot', target: 'self' } : { type: 'shoot', target: 'opponent' };
+}

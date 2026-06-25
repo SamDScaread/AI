@@ -13,10 +13,10 @@
 <body>
 <div id="app">
 
-  <!-- 3D 体素舞台 -->
+  <!-- 3D 体素舞台（同时作为菜单/过场的背景） -->
   <div id="stage"></div>
 
-  <!-- 悬浮 HUD -->
+  <!-- 对局 HUD -->
   <div id="hud" hidden>
     <div class="topbar">
       <div id="roundTag">第一局</div>
@@ -24,8 +24,8 @@
     </div>
     <div id="magReadout"></div>
 
-    <div class="fighter opp" id="oppPanel"></div>
     <div class="fighter you" id="youPanel"></div>
+    <div class="fighter opp" id="oppPanel"></div>
 
     <section class="controls" id="controls" aria-disabled="true">
       <button class="shoot-self" id="shootSelf" disabled>抵住自己 · 扣下扳机</button>
@@ -35,18 +35,57 @@
     </section>
   </div>
 
-  <!-- 开场 -->
+  <!-- 标题闸门（首屏，点击解锁音频） -->
   <div id="startScreen" class="overlay">
     <div class="title">深空轮盘</div>
     <div class="subtitle">γ-7 气闸厅 · 实弹与空包的对赌</div>
-    <p class="brief">
-      补给在三个月前耗尽。这座废弃中转站只剩两件东西：一把混着实芯弹与空包弹的脉冲钉枪，
-      和坐在你对面、被称作「仲裁者」的站务核心。<br><br>
-      轮流扣下扳机。抵住自己赌一发空响以保住回合，或瞄准它——但你永远不知道下一发是实是空。
-      三局递减的血量，越打越满的弹仓。活下来。
-    </p>
-    <button class="btn-major" id="enterBtn">进 入 气 闸</button>
+    <button class="btn-major" id="enterBtn">进 入</button>
     <div class="warn">建议佩戴耳机 · 含强烈音效、闪烁与画面震动 · 体素 3D 渲染</div>
+  </div>
+
+  <!-- 主菜单 -->
+  <div id="menu" class="overlay" hidden>
+    <div class="title menu-title">深空轮盘</div>
+    <div class="subtitle">γ-7 气闸厅</div>
+    <nav class="menu-list">
+      <button id="mPractice">练习模式</button>
+      <button id="mOnline" class="soon">联机模式 · 敬请期待</button>
+      <button id="mStory">背景故事</button>
+      <button id="mTutorial">新手教程</button>
+      <button id="mCredits">开发人员</button>
+      <button id="mFeedback">向设计师反馈</button>
+      <button id="mQuit">退出游戏</button>
+    </nav>
+  </div>
+
+  <!-- 过场动画（背景故事 / 鸣谢） -->
+  <div id="cinematic" class="overlay cine" hidden>
+    <div id="cineText" class="cine-text"></div>
+    <button id="cineSkip" class="cine-skip">跳过 ▸</button>
+  </div>
+
+  <!-- 反馈（mailto） -->
+  <div id="feedbackScreen" class="overlay" hidden>
+    <div class="verdict">向设计师反馈</div>
+    <p class="flavor">写下你的想法、bug 或点子。点击发送会打开你的邮件 App、内容已填好，确认后即发往设计师邮箱。</p>
+    <textarea id="fbText" class="fb-text" placeholder="在这里写下你的反馈……"></textarea>
+    <div class="mercy-actions">
+      <button class="grant" id="fbSend">用邮件发送</button>
+      <button id="fbCancel">返回</button>
+    </div>
+  </div>
+
+  <!-- 退出 -->
+  <div id="exitScreen" class="overlay" hidden>
+    <div class="verdict">气闸已关闭</div>
+    <p class="flavor">感谢游玩《深空轮盘》。<br>你可以直接关闭此标签页 —— 或者，再赌一把？</p>
+    <button class="btn-major" id="exitBack">返回主菜单</button>
+  </div>
+
+  <!-- 新手引导弹窗 -->
+  <div id="coach" class="coach" hidden>
+    <div id="coachText" class="coach-text"></div>
+    <button id="coachOk" class="coach-ok">知道了</button>
   </div>
 
   <!-- 怜悯抉择 -->
@@ -74,6 +113,6 @@
   <div id="blackout"></div>
 </div>
 
-<script type="module" src="/js/deepspace-3d.mjs"></script>
+<script type="module" src="/js/deepspace-menu.mjs"></script>
 </body>
 </html>

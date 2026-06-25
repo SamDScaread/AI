@@ -4,7 +4,7 @@
 // 游戏规则引擎、AI、恐怖音效全部原样复用（与 2D 版同源）。
 import * as THREE from 'three';
 import game, { ITEM_META } from '/server/games/deepspace.mjs';
-import { decideAction, decideMercy } from '/js/ai/deepspace-ai.mjs';
+import { decideAction, decideMercy, decideActionDumb } from '/js/ai/deepspace-ai.mjs';
 import { AudioKit } from '/js/deepspace-audio.mjs';
 
 const HUMAN = 'you';
@@ -315,6 +315,8 @@ function glitch() { const g = $('glitch'); g.classList.remove('on'); void g.offs
 
 // ============================================================ 游戏循环
 let state = null, aiBusy = false, lastEnd = null;
+// 由菜单/教程注入的可调项
+let aiDecide = decideAction, aiMercyFn = decideMercy, afterStepHook = null, onReturnToMenu = null, curOpts = {};
 const viewHuman = () => game.viewFor(state, HUMAN);
 const viewAi = () => game.viewFor(state, AI);
 
@@ -333,6 +335,7 @@ function applyStep(id, action) {
   state = res.state;
   for (const ev of res.events) handleEvent(ev);
   render();
+  if (afterStepHook) afterStepHook(viewHuman(), res.events); // 教程引导钩子
   return true;
 }
 
@@ -357,12 +360,12 @@ async function runAi() {
       if (state.phase === 'mercy_choice') {
         if (state.matchWinnerId !== AI) break;
         $('hint').textContent = '仲裁者正在裁决你的生死……';
-        await delay(1500); applyStep(AI, { type: 'mercy', choice: decideMercy(viewAi()) }); continue;
+        await delay(1500); applyStep(AI, { type: 'mercy', choice: aiMercyFn(viewAi()) }); continue;
       }
       if (viewHuman().turnId !== AI) break;
       $('hint').textContent = '仲裁者正在权衡……';
       await delay(620 + Math.random() * 600);
-      const action = decideAction(viewAi());
+      const action = aiDecide(viewAi());
       if (action.type === 'shoot') await preShot(AI, action.target);
       applyStep(AI, action);
       await delay(200);
@@ -516,18 +519,36 @@ function showEnd() {
     <div class="verdict ${won ? 'win' : 'lose'}">${won ? '你 活 着' : '你 死 在 了 这 里'}</div>
     <div class="credits-line">结算信用点：<b>${credits >= 0 ? '+' : ''}${credits}</b>${via ? '（怜悯豪赌）' : ''}</div>
     <div class="flavor">${flavor}</div>
-    <button class="btn-major" id="againBtn">再入气闸</button>`;
+    <div class="mercy-actions">
+      <button class="grant" id="againBtn">再入气闸</button>
+      <button id="toMenuBtn">返回主菜单</button>
+    </div>`;
   $('endScreen').hidden = false;
-  $('againBtn').onclick = () => { hideOverlays(); newMatch(); sync(); };
+  $('againBtn').onclick = () => { hideOverlays(); startMatch(curOpts); };
+  $('toMenuBtn').onclick = () => { hideOverlays(); $('hud').hidden = true; if (onReturnToMenu) onReturnToMenu(); };
 }
 
-// ============================================================ 启动
-function boot() {
+// ============================================================ 对外 API（供菜单/教程驱动）
+export { audio };
+export function setReturnHandler(fn) { onReturnToMenu = fn; }
+
+export function initGame() {
   buildScene();
   $('shootSelf').onclick = () => humanAct({ type: 'shoot', target: 'self' });
   $('shootOpp').onclick = () => humanAct({ type: 'shoot', target: 'opponent' });
   $('mercyGrant').onclick = () => { hideOverlays(); applyStep(HUMAN, { type: 'mercy', choice: 'grant' }); sync(); };
   $('mercyExec').onclick = () => { hideOverlays(); applyStep(HUMAN, { type: 'mercy', choice: 'decline' }); sync(); };
-  $('enterBtn').onclick = () => { audio.init(); $('startScreen').hidden = true; $('hud').hidden = false; newMatch(); sync(); };
 }
-document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', boot) : boot();
+
+// opts: { dumb?:bool, onStep?:(view,events)=>void }
+export function startMatch(opts = {}) {
+  curOpts = opts;
+  aiDecide = opts.dumb ? decideActionDumb : decideAction;
+  aiMercyFn = opts.dumb ? () => 'decline' : decideMercy;
+  afterStepHook = opts.onStep || null;
+  hideOverlays();
+  $('hud').hidden = false;
+  newMatch();
+  if (afterStepHook) afterStepHook(viewHuman(), []); // 开局即触发一次（教程开场引导）
+  sync();
+}
