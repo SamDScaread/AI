@@ -15,9 +15,13 @@ const $ = (id) => document.getElementById(id);
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 const audio = new AudioKit();
 
-// ============================================================ 3D 场景
-const PX = 3;
-const YOU_X = -2.3, AI_X = 2.3;
+// ============================================================ 3D 场景（隔桌面对面）
+const PX = 2;                 // 像素化倍率（调小=更精细、不那么脆）
+const OPP_Z = -2.35;          // 对手坐在桌子对面
+const TY = 1.0;               // 桌面高度
+const SEAT = { x: 0, y: 1.82, z: 3.5 };   // 你的座位（第一人称视角）
+const LOOK = { x: 0, y: 1.08, z: -1.0 };  // 视线落在桌面与对手之间
+const lerp = (a, b, t) => a + (b - a) * t;
 let renderer, scene, camera, clock;
 const S = {};
 
@@ -28,91 +32,93 @@ function addBox(g, w, h, d, material, x, y, z) {
   m.position.set(x, y, z); g.add(m); return m;
 }
 
-// 赛博朋克体素角色。kind: 'merc'(你/边缘雇佣兵) | 'arbiter'(仲裁者/站务核心)
-function buildFighter(kind) {
+// 坐在对面的对手「仲裁者」。比之前更立体、配色更丰富（钢蓝外套 + 枪金属 + 琥珀铆钉 + 青色面镜）。
+function buildOpponent() {
   const g = new THREE.Group();
-  if (kind === 'merc') {
-    const jacket = mat(0x232a1c, { metalness: 0.2, roughness: 0.9 });   // 军绿夹克
-    const dark = mat(0x14171d), skin = mat(0xb98a6a, { roughness: 1 });
-    const chrome = mat(0x8d97a4, { metalness: 0.9, roughness: 0.25 });   // 义肢
-    const neon = emat(0xff5a2a, 2.2);                                    // 橙红霓虹
-    const cyan = emat(0x2fb9c4, 2.0);
-    addBox(g, 0.92, 0.2, 0.52, dark, 0, 1.02, 0);                        // 腰带
-    addBox(g, 0.92, 1.04, 0.52, jacket, 0, 1.6, 0);                      // 夹克躯干
-    addBox(g, 0.12, 0.9, 0.06, neon, 0.18, 1.62, 0.27);                  // 胸口霓虹拉链
-    addBox(g, 0.5, 0.12, 0.55, neon, 0, 1.14, 0.0);                      // 腰部光带
-    addBox(g, 0.98, 0.22, 0.56, jacket, 0, 2.16, 0);                     // 立领
-    addBox(g, 0.34, 0.24, 0.54, jacket, -0.52, 2.12, 0);                 // 左肩
-    addBox(g, 0.34, 0.24, 0.54, jacket, 0.52, 2.12, 0);                  // 右肩
-    addBox(g, 0.22, 0.56, 0.24, jacket, -0.58, 1.72, 0.06);              // 左上臂
-    addBox(g, 0.2, 0.5, 0.22, dark, -0.58, 1.2, 0.06);                   // 左前臂
-    addBox(g, 0.24, 0.56, 0.26, chrome, 0.58, 1.72, 0.06);              // 右上臂(义肢)
-    addBox(g, 0.22, 0.5, 0.24, chrome, 0.58, 1.2, 0.06);                // 右前臂(义肢)
-    addBox(g, 0.06, 0.3, 0.25, cyan, 0.7, 1.2, 0.06);                   // 义肢发光缝
-    addBox(g, 0.26, 0.18, 0.26, skin, 0, 2.34, 0);                       // 脖子
-    addBox(g, 0.5, 0.52, 0.5, skin, 0, 2.62, 0);                         // 头
-    addBox(g, 0.52, 0.1, 0.08, cyan, 0, 2.66, 0.26);                     // 眼部目镜
-    addBox(g, 0.54, 0.16, 0.54, dark, 0, 2.94, 0);                       // 发型底
-    addBox(g, 0.1, 0.22, 0.5, neon, 0, 3.06, 0);                         // 莫西干霓虹
-    addBox(g, 0.08, 0.16, 0.1, cyan, 0.28, 2.62, 0.08);                  // 耳后植入体
-    g.userData.tint = 0xff5a2a;
-  } else {
-    const chrome = mat(0x10141c, { metalness: 0.85, roughness: 0.3 });   // 黑铬机体
-    const plate = mat(0x0a0d14, { metalness: 0.9, roughness: 0.2 });
-    const cyan = emat(0x2fb9c4, 2.4);
-    const red = emat(0xe2304a, 2.2);
-    addBox(g, 1.0, 0.22, 0.56, plate, 0, 1.04, 0);                       // 底盘
-    addBox(g, 1.0, 1.12, 0.58, chrome, 0, 1.64, 0);                      // 躯干
-    addBox(g, 0.34, 0.34, 0.3, cyan, 0, 1.72, 0.28);                     // 胸口核心(发光)
-    addBox(g, 0.9, 0.1, 0.6, cyan, 0, 1.18, 0);                          // 腰环
-    addBox(g, 0.46, 0.34, 0.64, plate, -0.62, 2.18, 0);                  // 左大肩甲
-    addBox(g, 0.46, 0.34, 0.64, plate, 0.62, 2.18, 0);                   // 右大肩甲
-    addBox(g, 0.08, 0.2, 0.62, cyan, -0.62, 2.18, 0);                    // 肩甲灯
-    addBox(g, 0.08, 0.2, 0.62, cyan, 0.62, 2.18, 0);
-    addBox(g, 0.26, 0.62, 0.28, chrome, -0.64, 1.74, 0.04);              // 左臂
-    addBox(g, 0.24, 0.56, 0.26, chrome, -0.64, 1.18, 0.04);
-    addBox(g, 0.26, 0.62, 0.28, chrome, 0.64, 1.74, 0.04);               // 右臂
-    addBox(g, 0.24, 0.56, 0.26, chrome, 0.64, 1.18, 0.04);
-    addBox(g, 0.24, 0.2, 0.24, plate, 0, 2.36, 0);                       // 颈
-    addBox(g, 0.56, 0.58, 0.56, plate, 0, 2.7, 0);                       // 头(全面甲)
-    addBox(g, 0.5, 0.12, 0.08, cyan, 0, 2.74, 0.28);                     // 横向视带
-    addBox(g, 0.06, 0.4, 0.08, chrome, 0, 2.7, 0.29);                    // 面甲竖缝
-    addBox(g, 0.1, 0.1, 0.1, chrome, 0.32, 2.7, 0);                      // 侧扬声器
-    addBox(g, 0.1, 0.1, 0.1, chrome, -0.32, 2.7, 0);
-    addBox(g, 0.05, 0.42, 0.05, chrome, 0.18, 3.18, 0);                  // 天线
-    addBox(g, 0.08, 0.08, 0.08, red, 0.18, 3.42, 0);                     // 天线红灯
-    g.userData.tint = 0x2fb9c4;
-  }
+  const coat = mat(0x232f3e, { metalness: 0.35, roughness: 0.7 });     // 钢蓝外套
+  const coatD = mat(0x161e28, { metalness: 0.3, roughness: 0.8 });     // 外套暗部/分缝
+  const steel = mat(0x3b434f, { metalness: 0.85, roughness: 0.35 });   // 枪金属护甲
+  const plate = mat(0x12161e, { metalness: 0.9, roughness: 0.25 });    // 面甲
+  const skinDk = mat(0x7d6f63, { roughness: 1 });                      // 下颌/喉
+  const cyan = emat(0x2fb9c4, 2.4);                                    // 青色面镜/核心
+  const amber = emat(0xd98a3a, 1.6);                                   // 琥珀铆钉/暖光条
+  const red = emat(0xe2304a, 2.0);
+  // 躯干与外套
+  addBox(g, 1.06, 0.24, 0.58, steel, 0, 1.02, 0);                      // 腰甲
+  addBox(g, 1.02, 1.12, 0.56, coat, 0, 1.62, 0);                       // 躯干外套
+  addBox(g, 0.16, 1.0, 0.06, coatD, -0.2, 1.62, 0.28);                 // 外套门襟分缝
+  addBox(g, 0.16, 1.0, 0.06, coatD, 0.2, 1.62, 0.28);
+  addBox(g, 0.32, 0.32, 0.26, cyan, 0, 1.74, 0.27);                    // 胸口反应核心
+  addBox(g, 0.5, 0.08, 0.06, amber, 0, 1.2, 0.29);                     // 腰部暖光条
+  addBox(g, 0.07, 0.07, 0.06, amber, -0.42, 1.95, 0.29);               // 铆钉
+  addBox(g, 0.07, 0.07, 0.06, amber, 0.42, 1.95, 0.29);
+  // 肩甲与手臂
+  addBox(g, 0.5, 0.36, 0.66, steel, -0.64, 2.2, 0);                    // 左肩甲
+  addBox(g, 0.5, 0.36, 0.66, steel, 0.64, 2.2, 0);                     // 右肩甲
+  addBox(g, 0.08, 0.22, 0.66, cyan, -0.64, 2.22, 0);                   // 肩灯
+  addBox(g, 0.08, 0.22, 0.66, cyan, 0.64, 2.22, 0);
+  addBox(g, 0.28, 0.66, 0.3, coat, -0.66, 1.74, 0.06);                 // 左上臂
+  addBox(g, 0.26, 0.5, 0.28, steel, -0.66, 1.18, 0.12);               // 左前臂(放桌上)
+  addBox(g, 0.28, 0.66, 0.3, coat, 0.66, 1.74, 0.06);                  // 右上臂
+  addBox(g, 0.26, 0.5, 0.28, steel, 0.66, 1.18, 0.12);                // 右前臂
+  // 头/面甲
+  addBox(g, 0.26, 0.22, 0.26, skinDk, 0, 2.36, 0);                     // 颈
+  addBox(g, 0.58, 0.6, 0.58, plate, 0, 2.72, 0);                       // 头(全面甲)
+  addBox(g, 0.52, 0.14, 0.08, cyan, 0, 2.78, 0.29);                    // 横向视带
+  addBox(g, 0.5, 0.05, 0.07, amber, 0, 2.62, 0.3);                     // 面甲下暖缝
+  addBox(g, 0.62, 0.14, 0.6, steel, 0, 3.04, 0);                       // 头冠/兜帽边
+  addBox(g, 0.05, 0.4, 0.05, steel, 0.2, 3.3, -0.05);                  // 天线
+  addBox(g, 0.07, 0.07, 0.07, red, 0.2, 3.52, -0.05);                  // 天线红灯
+  S.oppVisor = cyan;                                                   // 供回合高亮用
   return g;
 }
 
+// 第一人称：你搭在桌沿的两条前臂（暗色袖 + 肤色手），点缀在画面下方营造临场感。
+function buildHands() {
+  const g = new THREE.Group();
+  const sleeve = mat(0x1c2630, { roughness: 0.85 });
+  const skin = mat(0xb08a6a, { roughness: 1 });
+  const steel = mat(0x8d97a4, { metalness: 0.9, roughness: 0.3 });
+  // 左臂（普通）
+  const la = addBox(g, 0.34, 0.26, 1.0, sleeve, -0.62, TY + 0.06, 1.05); la.rotation.x = -0.12;
+  addBox(g, 0.3, 0.18, 0.34, skin, -0.62, TY + 0.1, 0.58);
+  // 右臂（铬义肢，呼应雇佣兵设定）
+  const ra = addBox(g, 0.34, 0.26, 1.0, sleeve, 0.62, TY + 0.06, 1.05); ra.rotation.x = -0.12;
+  addBox(g, 0.3, 0.2, 0.34, steel, 0.62, TY + 0.1, 0.58);
+  addBox(g, 0.08, 0.08, 0.24, emat(0x2fb9c4, 2), 0.62, TY + 0.22, 0.62);
+  return g;
+}
+
+// 枪管沿本地 +Z；yaw=0 指向你(+Z)，yaw=π 指向对手(-Z)。
 function buildGun() {
   const g = new THREE.Group();
-  const metal = mat(0x0c1016, { metalness: 0.85, roughness: 0.3 });
-  addBox(g, 0.7, 0.18, 0.18, metal, 0.05, 0, 0);
-  addBox(g, 0.55, 0.12, 0.12, metal, 0.5, 0.02, 0);
-  addBox(g, 0.16, 0.32, 0.16, metal, -0.18, -0.22, 0);
-  addBox(g, 0.08, 0.08, 0.2, emat(0xe2304a, 2.4), 0, 0.12, 0);
+  const metal = mat(0x10151c, { metalness: 0.85, roughness: 0.3 });
+  const steel = mat(0x424a56, { metalness: 0.9, roughness: 0.3 });
+  addBox(g, 0.2, 0.2, 0.72, metal, 0, 0, 0.06);        // 机身
+  addBox(g, 0.13, 0.13, 0.56, steel, 0, 0.03, 0.52);   // 枪管
+  addBox(g, 0.18, 0.34, 0.16, metal, 0, -0.22, -0.2);  // 握把
+  addBox(g, 0.22, 0.08, 0.1, steel, 0, 0.13, -0.05);   // 照门
+  addBox(g, 0.1, 0.1, 0.08, emat(0xe2304a, 2.6), 0, 0.14, -0.18); // 红色指示灯
   return g;
 }
 
 function buildRoom() {
-  const floor = new THREE.Mesh(new THREE.BoxGeometry(40, 1, 24), mat(0x070a10, { metalness: 0.4, roughness: 0.95 }));
-  floor.position.y = -0.5; scene.add(floor);
-  for (let i = -4; i <= 4; i++) {
-    const seam = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.02, 18), emat(0x0a2a30, 0.6));
-    seam.position.set(i * 1.6, 0.01, 0); scene.add(seam);
-  }
-  const wall = new THREE.Mesh(new THREE.BoxGeometry(40, 16, 1), mat(0x080b12, { roughness: 1 }));
-  wall.position.set(0, 6, -5); scene.add(wall);
-  for (let i = 0; i < 6; i++) {
-    const warn = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.5, 0.05), emat(i % 2 ? 0xcf6a1b : 0x301402, i % 2 ? 0.9 : 0.3, 0x100a04));
-    warn.position.set(-8.5 + i * 3.4, 0.7, -4.45); scene.add(warn);
-  }
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(2.2, 0.32, 6, 16), emat(0x123, 0.6, 0x0b0f16));
-  ring.material.metalness = 0.7; ring.position.set(0, 3.4, -4.6); scene.add(ring); S.ring = ring;
-  S.lamp = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.25, 0.5), emat(0xc9d4e0, 0.8, 0x05070b));
-  S.lamp.position.set(0, 7.4, 0.5); scene.add(S.lamp);
+  const g = (w, h, d, m, x, y, z) => { const e = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); e.position.set(x, y, z); scene.add(e); return e; };
+  g(40, 1, 30, mat(0x0a0e15, { metalness: 0.4, roughness: 0.95 }), 0, -0.5, -2);            // 地面（带点蓝）
+  for (let i = -4; i <= 4; i++) g(0.06, 0.02, 16, emat(0x12424a, 0.7), i * 1.7, 0.01, -3);  // 地面青色接缝
+  // 对手身后的后墙（带色板）
+  g(40, 18, 1, mat(0x0c1119, { roughness: 1 }), 0, 6, -7);
+  g(7, 4.2, 0.2, mat(0x182230, { metalness: 0.3, roughness: 0.8 }), 0, 2.6, -6.85);          // 墙面金属板
+  for (let i = 0; i < 6; i++) g(1.0, 0.45, 0.06, emat(i % 2 ? 0xcf6a1b : 0x803012, i % 2 ? 1.0 : 0.4, 0x140a04), -8.4 + i * 3.4, 0.6, -6.78); // 橙色警示条
+  g(4.4, 0.12, 0.06, emat(0xd9893a, 1.1, 0x140a04), -5.6, 3.1, -6.8);                          // 暖色长灯带
+  g(4.4, 0.12, 0.06, emat(0x2fb9c4, 0.9, 0x06222a), 5.6, 3.1, -6.8);                           // 冷色长灯带
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.9, 0.3, 6, 18), emat(0x1d5a64, 0.7, 0x0b1016));
+  ring.material.metalness = 0.7; ring.position.set(0, 3.3, -6.7); scene.add(ring); S.ring = ring;
+  // 侧面管线（暖/冷点缀）
+  g(0.25, 7, 0.25, mat(0x2a3340, { metalness: 0.7, roughness: 0.4 }), -5.5, 3, -5);
+  g(0.25, 7, 0.25, mat(0x2a3340, { metalness: 0.7, roughness: 0.4 }), 5.5, 3, -5);
+  // 头顶灯具（昏暗顶光的实体）
+  S.lamp = g(1.6, 0.3, 1.0, emat(0xdce6f2, 0.6, 0x0a0e14), 0, 4.6, -0.4);
 }
 
 function buildScene() {
@@ -121,60 +127,80 @@ function buildScene() {
   $('stage').appendChild(renderer.domElement);
 
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x04050a);
-  scene.fog = new THREE.Fog(0x04050a, 15, 34);
+  scene.background = new THREE.Color(0x05070c);
+  scene.fog = new THREE.Fog(0x05070c, 8, 26);
 
-  camera = new THREE.PerspectiveCamera(46, 16 / 9, 0.1, 100);
-  S.camBase = new THREE.Vector3(0.0, 3.8, 9.4);
-  S.camTarget = new THREE.Vector3(0, 1.55, 0);
+  camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.1, 100);
 
-  scene.add(new THREE.AmbientLight(0x33405c, 2.3));
-  S.overhead = new THREE.SpotLight(0xc9d4e0, 220, 30, 0.75, 0.6, 1.3);
-  S.overhead.position.set(0, 8, 1.2); S.overhead.target.position.set(0, 0.8, 0);
-  scene.add(S.overhead, S.overhead.target);
-  S.redL = new THREE.PointLight(0xe2304a, 26, 18, 2); S.redL.position.set(YOU_X, 2.8, 2.2); scene.add(S.redL);
-  S.cyL = new THREE.PointLight(0x2fb9c4, 26, 18, 2); S.cyL.position.set(AI_X, 2.8, 2.2); scene.add(S.cyL);
-  S.flashL = new THREE.PointLight(0xff3b3b, 0, 22, 2); S.flashL.position.set(0, 1.6, 1.6); scene.add(S.flashL);
+  S.amb = new THREE.AmbientLight(0x1b2740, 1.0); scene.add(S.amb);          // 低环境光（昏暗基调）
+  S.topBase = 130;                                                          // 顶光基础强度
+  S.topLight = new THREE.SpotLight(0xdce6f2, S.topBase, 16, 0.62, 0.7, 1.5); // 桌面昏暗顶光（会闪烁）
+  S.topLight.position.set(0, 4.5, -0.4); S.topLight.target.position.set(0, TY, -0.5);
+  scene.add(S.topLight, S.topLight.target);
+  S.warmFill = new THREE.PointLight(0x5a3a1e, 7, 10, 2); S.warmFill.position.set(0, 1.5, 3.4); scene.add(S.warmFill); // 你这侧暖色补光
+  S.coolRim = new THREE.PointLight(0x163e48, 12, 12, 2); S.coolRim.position.set(0, 2.4, -4.2); scene.add(S.coolRim);  // 对手身后冷色轮廓光
+  S.redL = new THREE.PointLight(0xe2304a, 6, 10, 2); S.redL.position.set(0, 1.9, 2.2); scene.add(S.redL);            // 你回合的暖红
+  S.cyL = new THREE.PointLight(0x2fb9c4, 6, 12, 2); S.cyL.position.set(0, 2.3, -2.0); scene.add(S.cyL);              // 对手回合的青
+  S.flashL = new THREE.PointLight(0xff3b3b, 0, 20, 2); S.flashL.position.set(0, 1.5, 0); scene.add(S.flashL);
 
   buildRoom();
-  const table = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.5, 2.1), mat(0x0e131b, { metalness: 0.5, roughness: 0.7 }));
-  table.position.set(0, 0.78, 0.3); scene.add(table);
-  const front = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.6, 0.12), mat(0x0a0e14)); front.position.set(0, 0.5, 1.32); scene.add(front);
+  // 长桌（沿 Z 摆放，双方隔桌相对）
+  const table = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.5, 3.6), mat(0x1a2230, { metalness: 0.5, roughness: 0.6 }));
+  table.position.set(0, TY - 0.25, -0.5); scene.add(table);
+  const inlay = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.02, 3.4), emat(0x123842, 0.5, 0x0e1620));
+  inlay.position.set(0, TY + 0.005, -0.5); scene.add(inlay);              // 桌面发光内嵌
 
-  S.you = buildFighter('merc'); S.you.position.set(YOU_X, 0, 0.1); S.you.rotation.y = 0.32; scene.add(S.you);
-  S.ai = buildFighter('arbiter'); S.ai.position.set(AI_X, 0, 0.1); S.ai.rotation.y = -0.32; scene.add(S.ai);
+  S.opp = buildOpponent(); S.opp.position.set(0, 0, OPP_Z); scene.add(S.opp); // 对手坐对面，面朝你(+Z)
+  S.hands = buildHands(); scene.add(S.hands);                                 // 第一人称双手
 
-  S.gun = buildGun(); S.gun.position.set(0, 1.12, 0.3); scene.add(S.gun);
+  S.gun = buildGun(); S.gun.position.set(0, TY + 0.1, -0.3); scene.add(S.gun);
   S.muzzle = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), emat(0xff6a22, 4, 0xffd9a0));
   S.muzzle.visible = false; scene.add(S.muzzle);
 
-  // 复用资源：血量体素、桌面弹排、血粒子、尘埃
-  S.pipGeo = new THREE.BoxGeometry(0.16, 0.16, 0.16);
-  S.pipMat = emat(0xe2304a, 1.8, 0x3a0710);
-  S.pipDead = mat(0x140306);
-  S.shellGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.26, 6);
-  S.brass = mat(0x6b5320, { metalness: 0.7, roughness: 0.5 });
+  // 桌面陈列：血量代币、子弹、道具——全部材质缓存复用
+  S.hpAlive = emat(0xe7b24a, 1.7, 0x3a2a08);   // 暖琥珀=生命
+  S.hpDead = mat(0x241a0a);
+  S.shellGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.26, 8);
+  S.brass = mat(0x8a6a28, { metalness: 0.7, roughness: 0.45 });
   S.liveMat = emat(0xe2304a, 2, 0x3a0710); S.blankMat = emat(0x2fb9c4, 2, 0x06343a);
-  S.pips = new THREE.Group(); S.shells = new THREE.Group(); scene.add(S.pips, S.shells);
+  S.itemMat = {
+    smoke: emat(0xd9a441, 1.6, 0x2a1d06), scanner: emat(0x2fb9c4, 1.6, 0x06262c),
+    ejector: emat(0xc8d0d8, 1.4, 0x1c2026), maglock: emat(0xe2304a, 1.6, 0x2a0810),
+    overload: emat(0xc24fce, 1.6, 0x270a2c),
+  };
+  S.cube = new THREE.BoxGeometry(0.18, 0.18, 0.18);
+  S.hpYou = new THREE.Group(); S.hpOpp = new THREE.Group(); S.shells = new THREE.Group(); S.items = new THREE.Group();
+  scene.add(S.hpYou, S.hpOpp, S.shells, S.items);
 
   S.bloodGeo = new THREE.BoxGeometry(0.08, 0.08, 0.08);
   S.bloodMat = emat(0xe2304a, 1.3, 0x7a0712);
   S.blood = [];
   for (let i = 0; i < 48; i++) { const m = new THREE.Mesh(S.bloodGeo, S.bloodMat); m.visible = false; scene.add(m); S.blood.push({ mesh: m, life: 0, vx: 0, vy: 0, vz: 0 }); }
 
-  const N = 260, pos = new Float32Array(N * 3);
-  for (let i = 0; i < N; i++) { pos[i * 3] = (Math.random() - 0.5) * 22; pos[i * 3 + 1] = Math.random() * 9; pos[i * 3 + 2] = (Math.random() - 0.5) * 12 - 1; }
+  const N = 240, pos = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) { pos[i * 3] = (Math.random() - 0.5) * 14; pos[i * 3 + 1] = Math.random() * 7; pos[i * 3 + 2] = (Math.random() - 0.5) * 14 - 2; }
   const dgeo = new THREE.BufferGeometry(); dgeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  S.dust = new THREE.Points(dgeo, new THREE.PointsMaterial({ color: 0x6a7585, size: 0.045, transparent: true, opacity: 0.45, sizeAttenuation: true }));
+  S.dust = new THREE.Points(dgeo, new THREE.PointsMaterial({ color: 0x7a8696, size: 0.04, transparent: true, opacity: 0.4, sizeAttenuation: true }));
   scene.add(S.dust);
 
-  S.shakeT = 0; S.shakeMag = 0; S.gunYaw = 0; S.gunYawTarget = 0; S.gunLift = 0;
+  S.shakeT = 0; S.shakeMag = 0; S.gunYaw = Math.PI; S.gunYawTarget = Math.PI; S.gunLift = 0;
   S.muzzleT = 0; S.flinch = { you: 0, ai: 0 }; S.turn = null;
   S.zoom = 0; S.zoomTarget = 0; S.slowmo = false; S.nextGlitch = 5; S.storyCam = false;
+  S.topGain = 1; S.lastLook = new THREE.Vector3(LOOK.x, LOOK.y, LOOK.z);
+  S.intro = { active: false, t: 0, dur: 1.7, fromPos: new THREE.Vector3(), fromTgt: new THREE.Vector3() };
 
   clock = new THREE.Clock();
   resize(); window.addEventListener('resize', resize);
   renderer.setAnimationLoop(loop);
+}
+
+// 开局：镜头从当前(菜单/故事)位置流畅过渡到座位视角，顶光渐亮、环境光压暗。
+function beginIntro() {
+  if (!camera) return;
+  S.storyCam = false;
+  S.intro.active = true; S.intro.t = 0;
+  S.intro.fromPos.copy(camera.position);
+  S.intro.fromTgt.copy(S.lastLook);
 }
 
 function resize() {
@@ -187,31 +213,36 @@ function loop() {
   const dt = Math.min(0.05, clock.getDelta());
   const t = clock.elapsedTime;
 
-  const fl = Math.random() < 0.04 ? 0.25 : 0.85 + Math.sin(t * 7) * 0.1;
-  S.lamp.material.emissiveIntensity = fl; S.overhead.intensity = 180 * fl + 40;
+  // 桌面昏暗顶光：偶尔骤暗一下营造紧张
+  const flick = Math.random() < 0.05 ? 0.22 + Math.random() * 0.2 : 0.82 + Math.sin(t * 8.5) * 0.07 + Math.sin(t * 2.3) * 0.05;
+  S.topLight.intensity = S.topBase * flick * S.topGain;
+  S.lamp.material.emissiveIntensity = 0.5 * flick + 0.08;
   if (S.ring) S.ring.material.emissiveIntensity = 0.5 + Math.sin(t * 1.3) * 0.2;
 
-  S.redL.intensity = 22 + (S.turn === HUMAN ? 16 : 0) + Math.sin(t * 2) * 3;
-  S.cyL.intensity = 22 + (S.turn === AI ? 16 : 0) + Math.sin(t * 2.2) * 3;
+  // 回合方亮起：你=暖红(近侧)，对手=青(对面)
+  S.redL.intensity = 4 + (S.turn === HUMAN ? 14 : 0) + Math.sin(t * 2) * 1.5;
+  S.cyL.intensity = 4 + (S.turn === AI ? 16 : 0) + Math.sin(t * 2.2) * 1.5;
+  if (S.oppVisor) S.oppVisor.emissiveIntensity = 2.0 + (S.turn === AI ? 1.2 : 0) + Math.sin(t * 3) * 0.3;
 
-  for (const [id, fig, bx] of [[HUMAN, S.you, YOU_X], [AI, S.ai, AI_X]]) {
-    fig.position.y = Math.sin(t * 1.6 + (id === AI ? 1.5 : 0)) * 0.025;
-    fig.position.x = bx + Math.sign(bx) * S.flinch[id];
-    S.flinch[id] *= (1 - Math.min(1, dt * 4));
-  }
+  // 对手呼吸 + 命中后仰（沿 -Z 往后缩）
+  S.opp.position.z = OPP_Z - S.flinch.ai * 0.5;
+  S.opp.position.y = Math.sin(t * 1.4) * 0.02;
+  S.flinch.ai *= (1 - Math.min(1, dt * 4));
+  S.hands.position.z = S.flinch.you * 0.4;   // 你受击时手往回缩
+  S.flinch.you *= (1 - Math.min(1, dt * 4));
 
+  // 枪：转向目标 + 抬起后落回（yaw=π 指向对手，0 指向你）
   S.gunYaw += (S.gunYawTarget - S.gunYaw) * Math.min(1, dt * 12);
   S.gun.rotation.y = S.gunYaw;
-  S.gun.position.y += ((1.12 + S.gunLift) - S.gun.position.y) * Math.min(1, dt * 9);
+  S.gun.position.y += ((TY + 0.1 + S.gunLift) - S.gun.position.y) * Math.min(1, dt * 9);
   S.gunLift *= (1 - Math.min(1, dt * 3));
 
   if (S.muzzleT > 0) {
     S.muzzleT -= dt; S.muzzle.visible = true;
     S.muzzle.material.emissiveIntensity = 2 + Math.random() * 4;
-    S.flashL.intensity = Math.max(0, S.muzzleT * 260);
+    S.flashL.intensity = Math.max(0, S.muzzleT * 300);
   } else { S.muzzle.visible = false; S.flashL.intensity = 0; }
 
-  // 血粒子
   for (const p of S.blood) {
     if (p.life <= 0) continue;
     p.life -= dt; if (p.life <= 0) { p.mesh.visible = false; continue; }
@@ -219,31 +250,39 @@ function loop() {
     p.vy -= 9.8 * dt * 0.4; p.mesh.scale.setScalar(Math.max(0.2, p.life * 1.8));
   }
 
-  // 尘埃缓慢上飘 + 回绕
   const dp = S.dust.geometry.attributes.position;
-  for (let i = 0; i < dp.count; i++) { let y = dp.getY(i) + dt * 0.12; if (y > 9) y = 0; dp.setY(i, y); }
-  dp.needsUpdate = true; S.dust.rotation.y += dt * 0.01;
+  for (let i = 0; i < dp.count; i++) { let y = dp.getY(i) + dt * 0.1; if (y > 7) y = 0; dp.setY(i, y); }
+  dp.needsUpdate = true;
 
-  // 偶发屏幕故障
   S.nextGlitch -= dt; if (S.nextGlitch <= 0) { glitch(); S.nextGlitch = 4 + Math.random() * 6; }
 
-  // 背景故事/鸣谢的电影运镜：镜头在气闸厅里缓缓游移
+  // —— 相机：故事运镜 / 开局过渡 / 座位视角 ——
   if (S.storyCam) {
-    camera.position.set(Math.sin(t * 0.13) * 4.4, 3.0 + Math.sin(t * 0.09) * 0.8, 9.0 + Math.cos(t * 0.11) * 2.4);
-    camera.fov = 44; camera.updateProjectionMatrix();
-    camera.lookAt(0, 1.7, 0);
-    renderer.render(scene, camera);
-    return;
+    S.topGain = 0.55; S.amb.intensity = 1.7;
+    camera.position.set(Math.sin(t * 0.13) * 4.2, 2.6 + Math.sin(t * 0.09) * 0.7, 4.6 + Math.cos(t * 0.11) * 2.2);
+    camera.fov = 46; camera.updateProjectionMatrix();
+    S.lastLook.set(0, 1.5, -1.2); camera.lookAt(S.lastLook);
+    renderer.render(scene, camera); return;
   }
-
-  // 慢动作推镜 + 抖动
+  if (S.intro.active) {
+    S.intro.t += dt; const p = Math.min(1, S.intro.t / S.intro.dur); const e = p * p * (3 - 2 * p);
+    S.topGain = e; S.amb.intensity = lerp(1.9, 1.0, e);
+    const fp = S.intro.fromPos, ft = S.intro.fromTgt;
+    camera.position.set(lerp(fp.x, SEAT.x, e), lerp(fp.y, SEAT.y, e), lerp(fp.z, SEAT.z, e));
+    camera.fov = lerp(46, 50, e); camera.updateProjectionMatrix();
+    S.lastLook.set(lerp(ft.x, LOOK.x, e), lerp(ft.y, LOOK.y, e), lerp(ft.z, LOOK.z, e)); camera.lookAt(S.lastLook);
+    if (p >= 1) S.intro.active = false;
+    renderer.render(scene, camera); return;
+  }
+  // 座位视角 + 慢动作向对手推近 + 抖动
+  S.topGain = 1; S.amb.intensity = 1.0;
   S.zoom += (S.zoomTarget - S.zoom) * Math.min(1, dt * 6);
   let ox = 0, oy = 0;
   if (S.shakeT > 0) { S.shakeT -= dt; const m = S.shakeT * S.shakeMag; ox += (Math.random() - 0.5) * m; oy += (Math.random() - 0.5) * m; }
-  if (S.zoom > 0.05) { ox += (Math.random() - 0.5) * 0.05 * S.zoom; oy += (Math.random() - 0.5) * 0.05 * S.zoom; }
-  camera.position.set(S.camBase.x + ox, S.camBase.y + oy - 0.3 * S.zoom, S.camBase.z - 2.7 * S.zoom);
-  camera.fov = 46 - 7 * S.zoom; camera.updateProjectionMatrix();
-  camera.lookAt(S.camTarget);
+  if (S.zoom > 0.05) { ox += (Math.random() - 0.5) * 0.04 * S.zoom; oy += (Math.random() - 0.5) * 0.04 * S.zoom; }
+  camera.position.set(SEAT.x + ox, SEAT.y + oy - 0.18 * S.zoom, SEAT.z - 1.7 * S.zoom);
+  camera.fov = 50 - 8 * S.zoom; camera.updateProjectionMatrix();
+  S.lastLook.set(LOOK.x, LOOK.y, LOOK.z); camera.lookAt(S.lastLook);
 
   renderer.render(scene, camera);
 }
@@ -252,50 +291,62 @@ function clearGroup(g) { while (g.children.length) g.remove(g.children[0]); }
 
 function update3D(v) {
   S.turn = (v.phase === 'duel' || v.phase === 'mercy_duel') ? v.turnId : null;
-  clearGroup(S.pips);
-  for (const [id, fig] of [[HUMAN, S.you], [AI, S.ai]]) {
+  // 血量代币：你的在近侧桌沿、对手的在远侧桌沿
+  clearGroup(S.hpYou); clearGroup(S.hpOpp);
+  const rowHp = (grp, id, z) => {
     const hp = v.hp[id], max = v.hpMax;
     for (let i = 0; i < max; i++) {
-      const pip = new THREE.Mesh(S.pipGeo, i < hp ? S.pipMat : S.pipDead);
-      pip.position.set(fig.position.x - (max - 1) * 0.12 + i * 0.24, 3.6, 0.1);
-      S.pips.add(pip);
+      const c = new THREE.Mesh(S.cube, i < hp ? S.hpAlive : S.hpDead);
+      c.scale.set(0.75, 1.5, 0.75);
+      c.position.set(-(max - 1) * 0.13 + i * 0.26, TY + 0.14, z);
+      grp.add(c);
     }
-  }
+  };
+  rowHp(S.hpYou, HUMAN, 1.2); rowHp(S.hpOpp, AI, -1.9);
+  // 子弹排（桌中央），第一发=当前膛内（扫描过才染色并抬起）
   clearGroup(S.shells);
   const total = v.mag.total;
   for (let i = 0; i < total; i++) {
     let m = S.brass;
     if (i === 0 && v.currentShell) m = v.currentShell === 'live' ? S.liveMat : S.blankMat;
-    const sh = new THREE.Mesh(S.shellGeo, m);
-    sh.rotation.z = Math.PI / 2;
-    sh.position.set(-(total - 1) * 0.11 + i * 0.22, 1.06 + (i === 0 ? 0.12 : 0), 1.05);
+    const sh = new THREE.Mesh(S.shellGeo, m); sh.rotation.z = Math.PI / 2;
+    sh.position.set(-(total - 1) * 0.11 + i * 0.22, TY + 0.07 + (i === 0 ? 0.05 : 0), 0.5);
     S.shells.add(sh);
   }
+  // 道具陈列：双方各自摆在自己面前
+  clearGroup(S.items);
+  const rowItems = (id, z) => {
+    const inv = v.items[id] || [];
+    inv.forEach((it, i) => {
+      const c = new THREE.Mesh(S.cube, S.itemMat[it] || S.brass);
+      c.position.set(-(inv.length - 1) * 0.15 + i * 0.3, TY + 0.1, z); S.items.add(c);
+    });
+  };
+  rowItems(HUMAN, 0.9); rowItems(AI, -1.35);
 }
 
-// side: 'you'(左) | 'ai'(右)
-function aimGun(side) {
-  S.gunYawTarget = side === 'you' ? Math.PI : 0; // 枪管(+x)指向目标方
-  S.gunLift = 0.22;
-}
+// side: 'you'(近/+Z) | 'ai'(对面/-Z)
+function aimGun(side) { S.gunYawTarget = side === 'you' ? 0 : Math.PI; S.gunLift = 0.18; }
 function muzzleFlash(live, side) {
-  S.muzzle.position.set(side === 'you' ? -0.7 : 0.7, 1.18, 0.3);
+  const z = side === 'you' ? 0.55 : -1.15;
+  S.muzzle.position.set(0, TY + 0.12, z);
   S.muzzle.scale.setScalar(live ? 1.3 : 0.6);
   S.muzzle.material.emissive.setHex(live ? 0xff5522 : 0x66aacc);
-  S.flashL.color.setHex(live ? 0xff3b3b : 0x2fb9c4);
+  S.flashL.color.setHex(live ? 0xff3b3b : 0x2fb9c4); S.flashL.position.set(0, TY + 0.3, z);
   S.muzzleT = live ? 0.18 : 0.1;
 }
 function camShake(mag) { S.shakeT = 0.4; S.shakeMag = mag; }
 
 function spawnBlood(side) {
-  const fig = side === 'you' ? S.you : S.ai;
-  const dir = fig.position.x < 0 ? -1 : 1;
+  const isOpp = side === 'ai';
+  const oy = isOpp ? 1.95 : 1.4, oz = isOpp ? OPP_Z + 0.35 : 2.5;
   let n = 0;
   for (const p of S.blood) {
     if (p.life > 0) continue; if (n++ >= 16) break;
     p.mesh.visible = true;
-    p.mesh.position.set(fig.position.x + (Math.random() - 0.5) * 0.3, 1.75 + (Math.random() - 0.5) * 0.5, 0.2 + (Math.random() - 0.5) * 0.3);
-    p.vx = (Math.random() * 0.7 + 0.25) * dir; p.vy = Math.random() * 1.7 + 0.6; p.vz = (Math.random() - 0.5) * 0.9;
+    p.mesh.position.set((Math.random() - 0.5) * 0.5, oy + (Math.random() - 0.5) * 0.5, oz + (Math.random() - 0.5) * 0.3);
+    p.vx = (Math.random() - 0.5) * 1.2; p.vy = Math.random() * 1.6 + 0.6;
+    p.vz = isOpp ? (Math.random() * 1.0 + 0.3) : -(Math.random() * 0.8 + 0.2); // 对手的血喷向你
     p.life = 0.6 + Math.random() * 0.35;
   }
 }
@@ -434,20 +485,12 @@ function render(v) {
   $('mist').style.opacity = String(Math.min(0.42, tension() * 0.5)); // 血雾随紧张升高
 }
 
+// HUD 只留精简名牌（血量/道具已陈列在 3D 桌面上）。
 function renderFighter(elId, v, id, isYou) {
   const el = $(elId);
   el.classList.toggle('turn', v.turnId === id && (v.phase === 'duel' || v.phase === 'mercy_duel'));
-  const hp = v.hp[id], max = v.hpMax;
-  const cells = Array.from({ length: max }, (_, i) => `<div class="cell ${i < hp ? 'full' : 'lost'}"></div>`).join('');
-  const items = (v.items[id] || []).map((it) => {
-    const m = ITEM_META[it]; return `<div class="item"><span class="ic">${m.icon}</span>${m.label}</div>`;
-  }).join('') || '<span class="empty">无道具</span>';
   const nm = (v._names && v._names[id]) || (id === HUMAN ? '你' : '仲裁者');
-  el.innerHTML = `
-    <div class="who"><span class="nm">${nm}</span>
-      <span class="tag">${isYou ? 'EDGERUNNER' : 'ARBITER'}</span></div>
-    <div class="hp">${cells}</div>
-    <div class="items">${items}</div>`;
+  el.innerHTML = `<span class="nm">${nm}</span><span class="tag">${isYou ? 'EDGERUNNER' : 'ARBITER'}</span><span class="hpnum">♥ ${v.hp[id]}/${v.hpMax}</span>`;
 }
 
 function renderItemBar(v) {
@@ -588,7 +631,7 @@ export function startOnline({ client, myId, onFirstState }) {
   let q = Promise.resolve();
   const enq = (fn) => { q = q.then(fn).catch((e) => console.error(e)); };
   client.on('state', (m) => enq(async () => {
-    if (firstState) { firstState = false; $('log').innerHTML = ''; $('hud').hidden = false; if (onFirstState) onFirstState(); }
+    if (firstState) { firstState = false; $('log').innerHTML = ''; $('hud').hidden = false; beginIntro(); if (onFirstState) onFirstState(); }
     netMe = m.view.you; netOpp = m.view.opponent; const v = remapView(m.view); render(v); onlineControls(v);
   }));
   client.on('event', (m) => enq(async () => { const ev = remapEvent(m.event); if (ev.kind === 'shoot') await preShot(ev.victimId === 'you' ? 'you' : 'ai'); handleEvent(ev); }));
@@ -631,6 +674,7 @@ export function startMatch(opts = {}) {
   afterStepHook = opts.onStep || null;
   hideOverlays();
   $('hud').hidden = false;
+  beginIntro();          // 镜头流畅过渡到座位 + 顶光渐亮
   newMatch();
   if (afterStepHook) afterStepHook(viewHuman(), []); // 开局即触发一次（教程开场引导）
   sync();

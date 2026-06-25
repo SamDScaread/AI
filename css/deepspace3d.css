@@ -31,17 +31,21 @@
 #magReadout .status { font-size: 11px; color: var(--dim); letter-spacing: .12em; margin-top: 4px; min-height: 1.1em; }
 #magReadout .scanned { color: var(--amber); }
 
-/* 战斗者卡片：半透明悬浮 */
+/* 精简名牌（血量/道具已陈列在 3D 桌面上）：对手居中靠上、你在左下 */
 #hud .fighter {
-  position: fixed; width: min(280px, 42vw);
-  background: linear-gradient(180deg, rgba(10,14,22,.78), rgba(5,7,12,.7));
-  border: 1px solid var(--edge); padding: 12px 16px; backdrop-filter: blur(3px);
+  position: fixed; display: inline-flex; align-items: baseline; gap: 10px;
+  background: linear-gradient(180deg, rgba(10,14,22,.72), rgba(5,7,12,.6));
+  border: 1px solid var(--edge); padding: 7px 14px; backdrop-filter: blur(3px);
+  font-size: 13px; letter-spacing: .08em; text-shadow: 0 0 6px #000;
 }
-/* 面板与各自的 3D 角色同侧：你(雇佣兵)在左、仲裁者在右 */
-#youPanel { top: 56px; left: 22px; }
-#oppPanel { top: 56px; right: 22px; }
-#hud .fighter.turn { border-color: var(--red); box-shadow: 0 0 22px var(--glow-r); }
-#hud .fighter.opp.turn { border-color: var(--cyan); box-shadow: 0 0 22px var(--glow-c); }
+#oppPanel { top: 64px; left: 50%; transform: translateX(-50%); }
+#youPanel { left: 22px; bottom: 98px; }
+#hud .fighter .nm { color: var(--bone); }
+#oppPanel .nm { color: var(--cyan); }
+#hud .fighter .tag { color: var(--dim); font-size: 9px; letter-spacing: .2em; }
+#hud .fighter .hpnum { color: var(--amber); font-size: 12px; }
+#hud .fighter.turn { border-color: var(--red); box-shadow: 0 0 18px var(--glow-r); }
+#hud .fighter.opp.turn { border-color: var(--cyan); box-shadow: 0 0 18px var(--glow-c); }
 
 /* 底部操作区 */
 #hud .controls {
@@ -57,8 +61,8 @@
 #log { bottom: 110px; }
 
 @media (max-width: 560px) {
-  #hud .fighter { width: 46vw; }
-  #oppPanel { top: 50px; }
+  #oppPanel { top: 58px; }
+  #youPanel { bottom: 110px; }
 }
 
 /* ---- 战斗特效层 ---- */
