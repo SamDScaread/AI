@@ -1,0 +1,61 @@
+/* 《深空轮盘》3D 体素版布局层。复用 deepspace.css 的配色与组件类（.fighter/.cell/
+   .item/.counts/button/.overlay/#log/#flash 等），这里只负责「全屏画布 + 悬浮 HUD」。 */
+
+#stage { position: fixed; inset: 0; z-index: 1; background: #04050a; }
+#stage canvas {
+  display: block; width: 100vw; height: 100vh;
+  image-rendering: pixelated; image-rendering: crisp-edges;
+}
+
+/* HUD 浮在 3D 之上，默认不挡鼠标，只有可交互元素恢复 pointer-events */
+#hud { position: fixed; inset: 0; z-index: 10; pointer-events: none; }
+
+#hud .topbar {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 14px 22px;
+}
+#roundTag { font-size: 18px; letter-spacing: .25em; color: var(--bone); text-shadow: 0 0 10px var(--glow-r), 0 0 2px #000; }
+#roundTag.crit { color: var(--red); animation: titleflick 2.5s infinite; }
+#winsTag { font-size: 12px; color: var(--ink); letter-spacing: .15em; text-shadow: 0 0 6px #000; text-align: right; }
+#winsTag b { color: var(--cyan); }
+
+/* 弹仓读数：顶部居中的大号实/空计数 */
+#magReadout {
+  position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+  text-align: center; text-shadow: 0 0 8px #000;
+}
+#magReadout .counts { display: flex; gap: 30px; justify-content: center; font-size: clamp(18px,3.4vw,30px); }
+#magReadout .live { color: var(--red); text-shadow: 0 0 12px var(--glow-r); }
+#magReadout .blank { color: var(--cyan); text-shadow: 0 0 12px var(--glow-c); }
+#magReadout small { display: block; font-size: 9px; color: var(--dim); letter-spacing: .25em; }
+#magReadout .status { font-size: 11px; color: var(--dim); letter-spacing: .12em; margin-top: 4px; min-height: 1.1em; }
+#magReadout .scanned { color: var(--amber); }
+
+/* 战斗者卡片：半透明悬浮 */
+#hud .fighter {
+  position: fixed; width: min(280px, 42vw);
+  background: linear-gradient(180deg, rgba(10,14,22,.78), rgba(5,7,12,.7));
+  border: 1px solid var(--edge); padding: 12px 16px; backdrop-filter: blur(3px);
+}
+#oppPanel { top: 56px; left: 22px; }
+#youPanel { top: 56px; right: 22px; }
+#hud .fighter.turn { border-color: var(--red); box-shadow: 0 0 22px var(--glow-r); }
+#hud .fighter.opp.turn { border-color: var(--cyan); box-shadow: 0 0 22px var(--glow-c); }
+
+/* 底部操作区 */
+#hud .controls {
+  position: fixed; left: 0; right: 0; bottom: 0; border: none; background:
+    linear-gradient(0deg, rgba(4,5,10,.85), transparent);
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+  gap: 16px; padding: 16px 22px; pointer-events: none;
+}
+#hud .controls button, #hud .controls .item.usable { pointer-events: auto; }
+#hud .controls[aria-disabled="true"] { opacity: .4; }
+#hud .hint { width: 100%; text-align: center; color: var(--dim); font-size: 11px; letter-spacing: .15em; min-height: 1.2em; text-shadow: 0 0 6px #000; }
+
+#log { bottom: 110px; }
+
+@media (max-width: 560px) {
+  #hud .fighter { width: 46vw; }
+  #oppPanel { top: 50px; }
+}

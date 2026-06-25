@@ -5,35 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
 <title>深空轮盘 · γ-7 气闸厅</title>
 <link rel="stylesheet" href="/css/deepspace.css" />
-<link rel="stylesheet" href="/css/deepspace3d.css" />
-<script type="importmap">
-{ "imports": { "three": "/js/vendor/three.module.js" } }
-</script>
 </head>
 <body>
 <div id="app">
-
-  <!-- 3D 体素舞台 -->
-  <div id="stage"></div>
-
-  <!-- 悬浮 HUD -->
-  <div id="hud" hidden>
-    <div class="topbar">
-      <div id="roundTag">第一局</div>
-      <div id="winsTag"></div>
-    </div>
-    <div id="magReadout"></div>
-
-    <div class="fighter opp" id="oppPanel"></div>
-    <div class="fighter you" id="youPanel"></div>
-
-    <section class="controls" id="controls" aria-disabled="true">
-      <button class="shoot-self" id="shootSelf" disabled>抵住自己 · 扣下扳机</button>
-      <button class="shoot-opp" id="shootOpp" disabled>瞄准仲裁者 · 开枪</button>
-      <div id="itemBar"></div>
-      <div class="hint" id="hint"></div>
-    </section>
-  </div>
 
   <!-- 开场 -->
   <div id="startScreen" class="overlay">
@@ -46,8 +20,29 @@
       三局递减的血量，越打越满的弹仓。活下来。
     </p>
     <button class="btn-major" id="enterBtn">进 入 气 闸</button>
-    <div class="warn">建议佩戴耳机 · 含强烈音效、闪烁与画面震动 · 体素 3D 渲染</div>
+    <div class="warn">建议佩戴耳机 · 含强烈音效、闪烁与画面震动</div>
   </div>
+
+  <!-- 战场 -->
+  <main id="board" hidden>
+    <header id="hud">
+      <div id="roundTag">第一局</div>
+      <div id="winsTag"></div>
+    </header>
+
+    <section class="combatants">
+      <div class="fighter opp" id="oppPanel"></div>
+      <div class="chamber" id="chamber"></div>
+      <div class="fighter you" id="youPanel"></div>
+    </section>
+
+    <section class="controls" id="controls" aria-disabled="true">
+      <button class="shoot-self" id="shootSelf" disabled>抵住自己 · 扣下扳机</button>
+      <button class="shoot-opp" id="shootOpp" disabled>瞄准仲裁者 · 开枪</button>
+      <div id="itemBar"></div>
+      <div class="hint" id="hint"></div>
+    </section>
+  </main>
 
   <!-- 怜悯抉择 -->
   <div id="mercyScreen" class="overlay" hidden>
@@ -71,6 +66,6 @@
   <div id="flash"></div>
 </div>
 
-<script type="module" src="/js/deepspace-3d.mjs"></script>
+<script type="module" src="/js/deepspace-ui.mjs"></script>
 </body>
 </html>
