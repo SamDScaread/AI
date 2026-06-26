@@ -16,7 +16,7 @@ const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 const audio = new AudioKit();
 
 // ============================================================ 3D 场景（隔桌面对面）
-const PX = 2;                 // 像素化倍率（调小=更精细、不那么脆）
+const PX = 1.5;               // 像素化倍率（调小=更精细，便于看清人物面部）
 const OPP_Z = -2.95;          // 对手坐在桌子对面（更远，容纳更大的体型）
 const TY = 1.0;               // 桌面高度
 const OPP_SCALE = 1.28;       // 对手整体放大
@@ -41,55 +41,103 @@ function addPart(g, geo, material, x, y, z, rx = 0, ry = 0, rz = 0) {
   m.position.set(x, y, z); m.rotation.set(rx, ry, rz); g.add(m); return m;
 }
 
-// 坐在对面的对手「仲裁者」：用圆滑体块搭出近似人形（圆头、圆肩、胶囊四肢），
-// 赛博朋克着装（钢蓝大衣 + 兜帽 + 义眼光带 + 暖色点缀），尽量像人而非方块。
+// 坐在对面的对手：风格化写实的赛博朋克边缘人——真实人脸（眉/眼/鼻/嘴/下颌）、
+// 莫西干+剃边发型、皮夹克立领、一只义眼与铬制义肢手臂。仅借鉴画风，不复制任何具体角色。
 function buildOpponent() {
   const g = new THREE.Group();
-  const coat = mat(0x2a3647, { metalness: 0.35, roughness: 0.7 });     // 钢蓝大衣
-  const coatD = mat(0x1a232f, { metalness: 0.3, roughness: 0.85 });    // 大衣暗部/兜帽
-  const steel = mat(0x49525f, { metalness: 0.85, roughness: 0.35 });   // 护甲/义肢
-  const skin = mat(0x9c7f68, { roughness: 1 });                        // 皮肤
-  const cyan = emat(0x2fb9c4, 2.4);                                    // 义眼光带/核心
-  const amber = emat(0xd9893a, 1.5);                                   // 暖色点缀
-  const red = emat(0xe2304a, 2.0);
-  addPart(g, capsule(0.34, 0.66), mat(0x20303a, { roughness: 0.9 }), 0, 1.5, 0);   // 躯干
-  addPart(g, capsule(0.42, 0.62), coat, 0, 1.5, -0.02);                            // 外披大衣
-  addPart(g, cyl(0.2, 0.46, 0.5), coat, 0, 1.12, 0.02);                            // 大衣下摆外扩
-  addPart(g, ball(0.12), cyan, 0, 1.66, 0.34);                                     // 胸口核心
-  addPart(g, capsule(0.05, 0.5), amber, 0, 1.3, 0.36, 0, 0, Math.PI / 2);          // 暖色光条
-  addPart(g, capsule(0.22, 0.66), steel, 0, 2.0, -0.02, 0, 0, Math.PI / 2);        // 圆肩横梁
-  addPart(g, capsule(0.07, 0.5), cyan, 0, 2.0, 0.06, 0, 0, Math.PI / 2);           // 肩灯
-  addPart(g, capsule(0.15, 0.34), coat, -0.5, 1.74, 0.08, 0.5, 0, 0.18);           // 左上臂
-  addPart(g, capsule(0.14, 0.46), coat, -0.46, 1.2, 0.5, Math.PI / 2.1, 0, 0);     // 左前臂(伸向桌面)
-  addPart(g, ball(0.16), skin, -0.44, 1.13, 0.86);                                 // 左手
-  addPart(g, capsule(0.15, 0.34), steel, 0.5, 1.74, 0.08, 0.5, 0, -0.18);          // 右上臂(义肢)
-  addPart(g, capsule(0.14, 0.46), steel, 0.46, 1.2, 0.5, Math.PI / 2.1, 0, 0);     // 右前臂(义肢)
-  addPart(g, ball(0.16), steel, 0.44, 1.13, 0.86);                                 // 右手(义肢)
-  addPart(g, capsule(0.03, 0.18), cyan, 0.46, 1.26, 0.62, Math.PI / 2.1, 0, 0);    // 义肢光缝
-  addPart(g, cyl(0.13, 0.15, 0.18), skin, 0, 2.32, 0);                             // 颈
-  const head = addPart(g, ball(0.31), skin, 0, 2.66, 0.02); head.scale.set(0.96, 1.12, 1.02); // 头
-  addPart(g, ball(0.18), skin, 0, 2.5, 0.12);                                      // 下颌
-  const hood = addPart(g, ball(0.44), coatD, 0, 2.74, -0.12); hood.scale.set(1.06, 1.0, 1.05); // 兜帽
-  addPart(g, new THREE.TorusGeometry(0.26, 0.09, 8, 16), coat, 0, 2.36, 0, Math.PI / 2, 0, 0); // 大衣立领
-  addPart(g, capsule(0.055, 0.34), cyan, 0, 2.7, 0.27, 0, 0, Math.PI / 2);         // 横向义眼光带
-  addPart(g, ball(0.04), amber, -0.34, 2.66, 0.14);                                // 颞部植入
-  addPart(g, capsule(0.02, 0.34), steel, 0.16, 3.06, -0.18, 0.2, 0, 0);            // 天线
-  addPart(g, ball(0.045), red, 0.18, 3.27, -0.22);                                 // 天线红灯
-  S.oppVisor = cyan;
+  const skin = mat(0xb38a6e, { roughness: 0.82 });                     // 皮肤
+  const skinD = mat(0x8f6a52, { roughness: 0.9 });                     // 皮肤暗部/剃边
+  const jacket = mat(0x191d23, { metalness: 0.25, roughness: 0.6 });   // 深色皮夹克
+  const jacketHi = mat(0x2b3340, { metalness: 0.3, roughness: 0.5 });  // 立领/护板(钢蓝)
+  const shirt = mat(0x2a1a20, { roughness: 0.9 });                     // 暗红内衬
+  const chrome = mat(0x9aa3ad, { metalness: 0.95, roughness: 0.2 });   // 铬义肢
+  const dark = mat(0x14110f, { roughness: 0.9 });                      // 眼窝/缝隙
+  const hair = mat(0x141013, { roughness: 0.8 });                      // 发色
+  const eye = emat(0x37d0d8, 2.6);                                     // 义眼(发光)
+  const cyan = emat(0x2fb9c4, 2.2), amber = emat(0xd9893a, 1.6), magenta = emat(0xc83a6e, 1.3), red = emat(0xe2304a, 2.0);
+
+  const addHand = (x, m) => {
+    addBox(g, 0.16, 0.07, 0.14, m, x, 1.12, 0.82);                     // 掌
+    for (let i = 0; i < 3; i++) addBox(g, 0.035, 0.05, 0.12, m, x - 0.05 + i * 0.05, 1.12, 0.94); // 指
+    addBox(g, 0.04, 0.05, 0.08, m, x + (x < 0 ? 0.09 : -0.09), 1.12, 0.86); // 拇指
+  };
+
+  // —— 躯干 / 夹克 ——
+  addPart(g, capsule(0.27, 0.5), shirt, 0, 1.55, 0.02);                            // 内衬
+  addPart(g, capsule(0.36, 0.5), jacket, 0, 1.55, -0.02);                          // 夹克身
+  addBox(g, 0.2, 0.62, 0.1, jacket, -0.17, 1.6, 0.26, 0, 0, 0.16);                 // 左前襟
+  addBox(g, 0.2, 0.62, 0.1, jacket, 0.17, 1.6, 0.26, 0, 0, -0.16);                 // 右前襟
+  addBox(g, 0.04, 0.5, 0.06, chrome, 0.02, 1.6, 0.32, 0, 0, -0.16);                // 拉链
+  addBox(g, 0.13, 0.13, 0.04, amber, -0.24, 1.74, 0.3, 0, 0, 0.2);                 // 夹克徽章(发光)
+  addPart(g, cyl(0.27, 0.34, 0.42), jacket, 0, 1.2, 0);                            // 腰身收束
+  addPart(g, capsule(0.2, 0.74), jacket, 0, 2.0, -0.02, 0, 0, Math.PI / 2);        // 肩线
+  addBox(g, 0.36, 0.18, 0.42, jacketHi, -0.44, 2.12, 0);                           // 左肩护板
+  addBox(g, 0.34, 0.16, 0.4, jacketHi, 0.44, 2.12, 0);                             // 右肩护板
+  addBox(g, 0.18, 0.26, 0.1, jacketHi, -0.16, 2.06, 0.18, 0.3, 0, 0);              // 左立领
+  addBox(g, 0.18, 0.26, 0.1, jacketHi, 0.16, 2.06, 0.18, 0.3, 0, 0);              // 右立领
+
+  // —— 手臂（左肉手 / 右铬义肢）——
+  addPart(g, capsule(0.14, 0.34), jacket, -0.47, 1.78, 0.06, 0.45, 0, 0.18);       // 左上臂
+  addPart(g, capsule(0.115, 0.46), jacket, -0.44, 1.22, 0.5, Math.PI / 2.1, 0, 0); // 左前臂(袖)
+  addHand(-0.44, skin);
+  addPart(g, capsule(0.14, 0.34), chrome, 0.47, 1.78, 0.06, 0.45, 0, -0.18);       // 右上臂(义肢)
+  addPart(g, cyl(0.1, 0.12, 0.5), chrome, 0.44, 1.22, 0.5, Math.PI / 2, 0, 0);     // 右前臂(义肢筒)
+  addPart(g, new THREE.TorusGeometry(0.12, 0.03, 6, 12), cyan, 0.44, 1.22, 0.4, Math.PI / 2, 0, 0); // 义肢环灯
+  addHand(0.44, chrome);
+
+  // —— 颈 + 改造 ——
+  addPart(g, cyl(0.12, 0.14, 0.2), skin, 0, 2.3, 0);                               // 颈
+  addBox(g, 0.05, 0.1, 0.06, chrome, -0.13, 2.32, 0.04);                           // 颈部接口
+  addBox(g, 0.03, 0.03, 0.03, cyan, -0.13, 2.36, 0.07);                            // 接口灯
+
+  // —— 头 / 脸（五官）——
+  const head = addPart(g, ball(0.24), skin, 0, 2.62, 0.0); head.scale.set(0.94, 1.08, 1.0);
+  addBox(g, 0.3, 0.2, 0.26, skin, 0, 2.5, 0.06);                                   // 下颌
+  addBox(g, 0.14, 0.1, 0.12, skin, 0, 2.43, 0.18);                                 // 下巴
+  addBox(g, 0.3, 0.05, 0.07, skinD, 0, 2.69, 0.2);                                 // 眉骨
+  addBox(g, 0.1, 0.025, 0.04, hair, -0.09, 2.675, 0.235);                          // 左眉
+  addBox(g, 0.1, 0.025, 0.04, hair, 0.09, 2.675, 0.235);                           // 右眉
+  addBox(g, 0.1, 0.06, 0.03, dark, -0.095, 2.63, 0.225);                           // 左眼窝
+  addBox(g, 0.1, 0.06, 0.03, dark, 0.095, 2.63, 0.225);                            // 右眼窝
+  addPart(g, ball(0.03), mat(0xd8d2c8, { roughness: 0.5 }), -0.095, 2.63, 0.245);  // 左眼(肉眼)
+  addPart(g, ball(0.018), dark, -0.095, 2.63, 0.265);                              // 左瞳
+  addPart(g, ball(0.042), eye, 0.095, 2.63, 0.245);                                // 右眼(义眼,发光)
+  addBox(g, 0.06, 0.13, 0.13, skin, 0, 2.58, 0.26, 0.15, 0, 0);                    // 鼻
+  addBox(g, 0.11, 0.022, 0.03, mat(0x6a3a32, { roughness: 0.8 }), 0, 2.5, 0.255);  // 嘴
+  addBox(g, 0.05, 0.11, 0.1, skin, -0.235, 2.6, 0.02);                             // 左耳
+  addBox(g, 0.05, 0.11, 0.1, skin, 0.235, 2.6, 0.02);                              // 右耳
+  // 改造：右侧下颌铬板 + 左颞植入
+  addBox(g, 0.08, 0.2, 0.2, chrome, 0.19, 2.52, 0.08);                             // 右颌铬板
+  addBox(g, 0.02, 0.12, 0.02, cyan, 0.235, 2.52, 0.16);                            // 颌板灯纹
+  addBox(g, 0.06, 0.07, 0.06, chrome, -0.2, 2.72, 0.12);                           // 左颞植入
+  addPart(g, ball(0.018), amber, -0.2, 2.72, 0.16);                                // 植入灯
+  // 发型：剃边 + 上方莫西干（带霓虹挑染）
+  addBox(g, 0.16, 0.12, 0.34, skinD, -0.18, 2.66, -0.02);                          // 左剃边
+  addBox(g, 0.16, 0.12, 0.34, skinD, 0.18, 2.66, -0.02);                           // 右剃边
+  const crop = addPart(g, ball(0.23), hair, 0, 2.74, -0.04); crop.scale.set(0.78, 0.62, 1.02); // 顶发
+  addBox(g, 0.1, 0.2, 0.46, hair, 0, 2.9, -0.02);                                  // 莫西干
+  addBox(g, 0.05, 0.21, 0.46, magenta, 0, 2.93, -0.02);                            // 霓虹挑染
+  S.oppVisor = eye;   // 回合高亮：义眼会更亮
   return g;
 }
 
-// 第一人称：你搭在桌沿的两条前臂（圆滑胶囊 + 球形手，左肉手、右铬义肢）。
+// 第一人称：你搭在桌沿的两条前臂（带手指的手，左肉手、右铬义肢）。
 function buildHands() {
   const g = new THREE.Group();
-  const sleeve = mat(0x202a34, { roughness: 0.85 });
-  const skin = mat(0xb08a6a, { roughness: 1 });
-  const steel = mat(0x8d97a4, { metalness: 0.9, roughness: 0.3 });
-  addPart(g, capsule(0.14, 0.62), sleeve, -0.6, TY + 0.05, 1.2, Math.PI / 2.2, 0, 0);   // 左前臂
-  addPart(g, ball(0.15), skin, -0.6, TY + 0.08, 0.74);                                  // 左手
-  addPart(g, capsule(0.14, 0.62), sleeve, 0.6, TY + 0.05, 1.2, Math.PI / 2.2, 0, 0);    // 右前臂(义肢袖)
-  addPart(g, ball(0.15), steel, 0.6, TY + 0.08, 0.74);                                  // 右手(义肢)
-  addPart(g, capsule(0.03, 0.14), emat(0x2fb9c4, 2), 0.6, TY + 0.2, 0.78, Math.PI / 2.2, 0, 0); // 光缝
+  const sleeve = mat(0x191d23, { metalness: 0.2, roughness: 0.7 });
+  const skin = mat(0xb08a6a, { roughness: 0.85 });
+  const chrome = mat(0x9aa3ad, { metalness: 0.95, roughness: 0.2 });
+  const y = TY + 0.06;
+  const hand = (x, m) => {
+    addBox(g, 0.18, 0.08, 0.16, m, x, y, 0.72);                                   // 掌
+    for (let i = 0; i < 3; i++) addBox(g, 0.04, 0.06, 0.14, m, x - 0.055 + i * 0.055, y, 0.58); // 指
+    addBox(g, 0.05, 0.06, 0.09, m, x + (x < 0 ? 0.1 : -0.1), y, 0.66);            // 拇指
+  };
+  addPart(g, capsule(0.13, 0.6), sleeve, -0.6, y, 1.25, Math.PI / 2.2, 0, 0);     // 左前臂(袖)
+  hand(-0.6, skin);
+  addPart(g, cyl(0.1, 0.12, 0.6), chrome, 0.6, y, 1.25, Math.PI / 2, 0, 0);       // 右前臂(义肢)
+  addPart(g, new THREE.TorusGeometry(0.12, 0.03, 6, 12), emat(0x2fb9c4, 2), 0.6, y, 1.0, Math.PI / 2, 0, 0); // 环灯
+  hand(0.6, chrome);
   return g;
 }
 
@@ -143,6 +191,7 @@ function buildScene() {
   scene.add(S.topLight, S.topLight.target);
   S.warmFill = new THREE.PointLight(0x5a3a1e, 7, 10, 2); S.warmFill.position.set(0, 1.5, 3.4); scene.add(S.warmFill); // 你这侧暖色补光
   S.coolRim = new THREE.PointLight(0x163e48, 12, 12, 2); S.coolRim.position.set(0, 2.4, -4.2); scene.add(S.coolRim);  // 对手身后冷色轮廓光
+  S.faceL = new THREE.PointLight(0xb0bdd0, 14, 7, 2); S.faceL.position.set(0, 2.6, -1.5); scene.add(S.faceL);         // 打亮对手面部，让五官可辨
   S.redL = new THREE.PointLight(0xe2304a, 6, 10, 2); S.redL.position.set(0, 1.9, 2.2); scene.add(S.redL);            // 你回合的暖红
   S.cyL = new THREE.PointLight(0x2fb9c4, 6, 12, 2); S.cyL.position.set(0, 2.3, -2.0); scene.add(S.cyL);              // 对手回合的青
   S.flashL = new THREE.PointLight(0xff3b3b, 0, 20, 2); S.flashL.position.set(0, 1.5, 0); scene.add(S.flashL);
