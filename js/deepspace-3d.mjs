@@ -3,6 +3,7 @@
 // 开枪慢动作 + 命中喷血 + 受伤黑屏闪烁 + 主角叹气 + 漂浮尘埃/屏幕故障/血雾环境氛围。
 // 游戏规则引擎、AI、恐怖音效全部原样复用（与 2D 版同源）。
 import * as THREE from 'three';
+import { GLTFLoader } from '/js/vendor/GLTFLoader.js';
 import game, { ITEM_META } from '/server/games/deepspace.mjs';
 import { decideAction, decideMercy, decideActionDumb } from '/js/ai/deepspace-ai.mjs';
 import { AudioKit } from '/js/deepspace-audio.mjs';
@@ -22,6 +23,8 @@ const TY = 1.0;               // 桌面高度
 const OPP_SCALE = 1.28;       // 对手整体放大
 const SEAT = { x: 0, y: 1.98, z: 4.25 };  // 你的座位（第一人称视角，已后拉以配合更大的桌与对手）
 const LOOK = { x: 0, y: 1.18, z: -1.25 }; // 视线落在桌面与对手之间
+// 放入 assets/models/opponent.glb 后，把 enabled 改为 true 即替换占位角色；其余参数可微调。
+const MODEL = { enabled: false, opponent: '/assets/models/opponent.glb', targetH: 3.4, scaleMul: 1, yOffset: 0, rotY: 0 };
 const lerp = (a, b, t) => a + (b - a) * t;
 let renderer, scene, camera, clock;
 const S = {};
@@ -241,10 +244,37 @@ function buildScene() {
   S.zoom = 0; S.zoomTarget = 0; S.slowmo = false; S.nextGlitch = 5; S.storyCam = false;
   S.topGain = 1; S.lastLook = new THREE.Vector3(LOOK.x, LOOK.y, LOOK.z);
   S.intro = { active: false, t: 0, dur: 1.7, fromPos: new THREE.Vector3(), fromTgt: new THREE.Vector3() };
+  S.oppBase = { y: 0, z: OPP_Z }; S.mixer = null;
 
   clock = new THREE.Clock();
   resize(); window.addEventListener('resize', resize);
   renderer.setAnimationLoop(loop);
+  loadOpponentModel();   // 有 .glb 就替换占位角色，没有则保留几何体小人
+}
+
+// 尝试加载对手 3D 模型；自动缩放到目标高度、双脚落地、水平居中。无文件则静默沿用占位角色。
+function loadOpponentModel() {
+  if (!MODEL.enabled) return; // 未启用：不发请求、保持控制台干净、沿用占位角色
+  fetch(MODEL.opponent)
+    .then((r) => (r.ok ? r.arrayBuffer() : null))
+    .then((buf) => {
+      if (!buf) return; // 没有模型文件 -> 保留占位几何体
+      new GLTFLoader().parse(buf, '', (gltf) => {
+        const m = gltf.scene;
+        m.rotation.y = MODEL.rotY;
+        let box = new THREE.Box3().setFromObject(m); const size = new THREE.Vector3(); box.getSize(size);
+        m.scale.multiplyScalar((MODEL.targetH / (size.y || 1)) * MODEL.scaleMul);
+        box = new THREE.Box3().setFromObject(m); const c = new THREE.Vector3(); box.getCenter(c);
+        S.oppBase = { y: -box.min.y + MODEL.yOffset, z: OPP_Z };
+        m.position.set(-c.x, S.oppBase.y, OPP_Z);
+        scene.remove(S.opp); S.opp = m; scene.add(m); S.oppVisor = null;
+        if (gltf.animations && gltf.animations.length) {
+          S.mixer = new THREE.AnimationMixer(m); S.mixer.clipAction(gltf.animations[0]).play();
+        }
+        log('已载入对手 3D 模型。', 'cyan');
+      }, (e) => console.warn('模型解析失败（若用了 Draco/KTX2 压缩，请用未压缩 .glb 重新导出）：', e && e.message ? e.message : e));
+    })
+    .catch(() => { /* 取模型失败：静默沿用占位角色 */ });
 }
 
 // 开局：镜头从当前(菜单/故事)位置流畅过渡到座位视角，顶光渐亮、环境光压暗。
@@ -277,9 +307,10 @@ function loop() {
   S.cyL.intensity = 4 + (S.turn === AI ? 16 : 0) + Math.sin(t * 2.2) * 1.5;
   if (S.oppVisor) S.oppVisor.emissiveIntensity = 2.0 + (S.turn === AI ? 1.2 : 0) + Math.sin(t * 3) * 0.3;
 
-  // 对手呼吸 + 命中后仰（沿 -Z 往后缩）
-  S.opp.position.z = OPP_Z - S.flinch.ai * 0.5;
-  S.opp.position.y = Math.sin(t * 1.4) * 0.02;
+  // 对手呼吸 + 命中后仰（沿 -Z 往后缩）；占位角色与真模型共用 oppBase 基准位
+  if (S.mixer) S.mixer.update(dt);
+  S.opp.position.z = S.oppBase.z - S.flinch.ai * 0.5;
+  S.opp.position.y = S.oppBase.y + Math.sin(t * 1.4) * 0.02;
   S.flinch.ai *= (1 - Math.min(1, dt * 4));
   S.hands.position.z = S.flinch.you * 0.4;   // 你受击时手往回缩
   S.flinch.you *= (1 - Math.min(1, dt * 4));
