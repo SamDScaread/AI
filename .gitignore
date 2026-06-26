@@ -4,3 +4,5 @@ package-lock.json
 .DS_Store
 .vscode/
 .idea/
+# 真人/个人角色模型不入库（隐私）。把 .glb 放在本地 assets/models/ 即可，并在 manifest.json 登记。
+assets/models/*.glb
