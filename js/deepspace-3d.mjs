@@ -17,10 +17,11 @@ const audio = new AudioKit();
 
 // ============================================================ 3D 场景（隔桌面对面）
 const PX = 2;                 // 像素化倍率（调小=更精细、不那么脆）
-const OPP_Z = -2.35;          // 对手坐在桌子对面
+const OPP_Z = -2.95;          // 对手坐在桌子对面（更远，容纳更大的体型）
 const TY = 1.0;               // 桌面高度
-const SEAT = { x: 0, y: 1.82, z: 3.5 };   // 你的座位（第一人称视角）
-const LOOK = { x: 0, y: 1.08, z: -1.0 };  // 视线落在桌面与对手之间
+const OPP_SCALE = 1.28;       // 对手整体放大
+const SEAT = { x: 0, y: 1.98, z: 4.25 };  // 你的座位（第一人称视角，已后拉以配合更大的桌与对手）
+const LOOK = { x: 0, y: 1.18, z: -1.25 }; // 视线落在桌面与对手之间
 const lerp = (a, b, t) => a + (b - a) * t;
 let renderer, scene, camera, clock;
 const S = {};
@@ -31,61 +32,64 @@ function addBox(g, w, h, d, material, x, y, z) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
   m.position.set(x, y, z); g.add(m); return m;
 }
+// 圆滑零件：用胶囊/球/圆柱搭出更像人的体块。
+const capsule = (r, len) => new THREE.CapsuleGeometry(r, len, 5, 12);
+const ball = (r) => new THREE.SphereGeometry(r, 16, 12);
+const cyl = (rt, rb, h) => new THREE.CylinderGeometry(rt, rb, h, 14);
+function addPart(g, geo, material, x, y, z, rx = 0, ry = 0, rz = 0) {
+  const m = new THREE.Mesh(geo, material);
+  m.position.set(x, y, z); m.rotation.set(rx, ry, rz); g.add(m); return m;
+}
 
-// 坐在对面的对手「仲裁者」。比之前更立体、配色更丰富（钢蓝外套 + 枪金属 + 琥珀铆钉 + 青色面镜）。
+// 坐在对面的对手「仲裁者」：用圆滑体块搭出近似人形（圆头、圆肩、胶囊四肢），
+// 赛博朋克着装（钢蓝大衣 + 兜帽 + 义眼光带 + 暖色点缀），尽量像人而非方块。
 function buildOpponent() {
   const g = new THREE.Group();
-  const coat = mat(0x232f3e, { metalness: 0.35, roughness: 0.7 });     // 钢蓝外套
-  const coatD = mat(0x161e28, { metalness: 0.3, roughness: 0.8 });     // 外套暗部/分缝
-  const steel = mat(0x3b434f, { metalness: 0.85, roughness: 0.35 });   // 枪金属护甲
-  const plate = mat(0x12161e, { metalness: 0.9, roughness: 0.25 });    // 面甲
-  const skinDk = mat(0x7d6f63, { roughness: 1 });                      // 下颌/喉
-  const cyan = emat(0x2fb9c4, 2.4);                                    // 青色面镜/核心
-  const amber = emat(0xd98a3a, 1.6);                                   // 琥珀铆钉/暖光条
+  const coat = mat(0x2a3647, { metalness: 0.35, roughness: 0.7 });     // 钢蓝大衣
+  const coatD = mat(0x1a232f, { metalness: 0.3, roughness: 0.85 });    // 大衣暗部/兜帽
+  const steel = mat(0x49525f, { metalness: 0.85, roughness: 0.35 });   // 护甲/义肢
+  const skin = mat(0x9c7f68, { roughness: 1 });                        // 皮肤
+  const cyan = emat(0x2fb9c4, 2.4);                                    // 义眼光带/核心
+  const amber = emat(0xd9893a, 1.5);                                   // 暖色点缀
   const red = emat(0xe2304a, 2.0);
-  // 躯干与外套
-  addBox(g, 1.06, 0.24, 0.58, steel, 0, 1.02, 0);                      // 腰甲
-  addBox(g, 1.02, 1.12, 0.56, coat, 0, 1.62, 0);                       // 躯干外套
-  addBox(g, 0.16, 1.0, 0.06, coatD, -0.2, 1.62, 0.28);                 // 外套门襟分缝
-  addBox(g, 0.16, 1.0, 0.06, coatD, 0.2, 1.62, 0.28);
-  addBox(g, 0.32, 0.32, 0.26, cyan, 0, 1.74, 0.27);                    // 胸口反应核心
-  addBox(g, 0.5, 0.08, 0.06, amber, 0, 1.2, 0.29);                     // 腰部暖光条
-  addBox(g, 0.07, 0.07, 0.06, amber, -0.42, 1.95, 0.29);               // 铆钉
-  addBox(g, 0.07, 0.07, 0.06, amber, 0.42, 1.95, 0.29);
-  // 肩甲与手臂
-  addBox(g, 0.5, 0.36, 0.66, steel, -0.64, 2.2, 0);                    // 左肩甲
-  addBox(g, 0.5, 0.36, 0.66, steel, 0.64, 2.2, 0);                     // 右肩甲
-  addBox(g, 0.08, 0.22, 0.66, cyan, -0.64, 2.22, 0);                   // 肩灯
-  addBox(g, 0.08, 0.22, 0.66, cyan, 0.64, 2.22, 0);
-  addBox(g, 0.28, 0.66, 0.3, coat, -0.66, 1.74, 0.06);                 // 左上臂
-  addBox(g, 0.26, 0.5, 0.28, steel, -0.66, 1.18, 0.12);               // 左前臂(放桌上)
-  addBox(g, 0.28, 0.66, 0.3, coat, 0.66, 1.74, 0.06);                  // 右上臂
-  addBox(g, 0.26, 0.5, 0.28, steel, 0.66, 1.18, 0.12);                // 右前臂
-  // 头/面甲
-  addBox(g, 0.26, 0.22, 0.26, skinDk, 0, 2.36, 0);                     // 颈
-  addBox(g, 0.58, 0.6, 0.58, plate, 0, 2.72, 0);                       // 头(全面甲)
-  addBox(g, 0.52, 0.14, 0.08, cyan, 0, 2.78, 0.29);                    // 横向视带
-  addBox(g, 0.5, 0.05, 0.07, amber, 0, 2.62, 0.3);                     // 面甲下暖缝
-  addBox(g, 0.62, 0.14, 0.6, steel, 0, 3.04, 0);                       // 头冠/兜帽边
-  addBox(g, 0.05, 0.4, 0.05, steel, 0.2, 3.3, -0.05);                  // 天线
-  addBox(g, 0.07, 0.07, 0.07, red, 0.2, 3.52, -0.05);                  // 天线红灯
-  S.oppVisor = cyan;                                                   // 供回合高亮用
+  addPart(g, capsule(0.34, 0.66), mat(0x20303a, { roughness: 0.9 }), 0, 1.5, 0);   // 躯干
+  addPart(g, capsule(0.42, 0.62), coat, 0, 1.5, -0.02);                            // 外披大衣
+  addPart(g, cyl(0.2, 0.46, 0.5), coat, 0, 1.12, 0.02);                            // 大衣下摆外扩
+  addPart(g, ball(0.12), cyan, 0, 1.66, 0.34);                                     // 胸口核心
+  addPart(g, capsule(0.05, 0.5), amber, 0, 1.3, 0.36, 0, 0, Math.PI / 2);          // 暖色光条
+  addPart(g, capsule(0.22, 0.66), steel, 0, 2.0, -0.02, 0, 0, Math.PI / 2);        // 圆肩横梁
+  addPart(g, capsule(0.07, 0.5), cyan, 0, 2.0, 0.06, 0, 0, Math.PI / 2);           // 肩灯
+  addPart(g, capsule(0.15, 0.34), coat, -0.5, 1.74, 0.08, 0.5, 0, 0.18);           // 左上臂
+  addPart(g, capsule(0.14, 0.46), coat, -0.46, 1.2, 0.5, Math.PI / 2.1, 0, 0);     // 左前臂(伸向桌面)
+  addPart(g, ball(0.16), skin, -0.44, 1.13, 0.86);                                 // 左手
+  addPart(g, capsule(0.15, 0.34), steel, 0.5, 1.74, 0.08, 0.5, 0, -0.18);          // 右上臂(义肢)
+  addPart(g, capsule(0.14, 0.46), steel, 0.46, 1.2, 0.5, Math.PI / 2.1, 0, 0);     // 右前臂(义肢)
+  addPart(g, ball(0.16), steel, 0.44, 1.13, 0.86);                                 // 右手(义肢)
+  addPart(g, capsule(0.03, 0.18), cyan, 0.46, 1.26, 0.62, Math.PI / 2.1, 0, 0);    // 义肢光缝
+  addPart(g, cyl(0.13, 0.15, 0.18), skin, 0, 2.32, 0);                             // 颈
+  const head = addPart(g, ball(0.31), skin, 0, 2.66, 0.02); head.scale.set(0.96, 1.12, 1.02); // 头
+  addPart(g, ball(0.18), skin, 0, 2.5, 0.12);                                      // 下颌
+  const hood = addPart(g, ball(0.44), coatD, 0, 2.74, -0.12); hood.scale.set(1.06, 1.0, 1.05); // 兜帽
+  addPart(g, new THREE.TorusGeometry(0.26, 0.09, 8, 16), coat, 0, 2.36, 0, Math.PI / 2, 0, 0); // 大衣立领
+  addPart(g, capsule(0.055, 0.34), cyan, 0, 2.7, 0.27, 0, 0, Math.PI / 2);         // 横向义眼光带
+  addPart(g, ball(0.04), amber, -0.34, 2.66, 0.14);                                // 颞部植入
+  addPart(g, capsule(0.02, 0.34), steel, 0.16, 3.06, -0.18, 0.2, 0, 0);            // 天线
+  addPart(g, ball(0.045), red, 0.18, 3.27, -0.22);                                 // 天线红灯
+  S.oppVisor = cyan;
   return g;
 }
 
-// 第一人称：你搭在桌沿的两条前臂（暗色袖 + 肤色手），点缀在画面下方营造临场感。
+// 第一人称：你搭在桌沿的两条前臂（圆滑胶囊 + 球形手，左肉手、右铬义肢）。
 function buildHands() {
   const g = new THREE.Group();
-  const sleeve = mat(0x1c2630, { roughness: 0.85 });
+  const sleeve = mat(0x202a34, { roughness: 0.85 });
   const skin = mat(0xb08a6a, { roughness: 1 });
   const steel = mat(0x8d97a4, { metalness: 0.9, roughness: 0.3 });
-  // 左臂（普通）
-  const la = addBox(g, 0.34, 0.26, 1.0, sleeve, -0.62, TY + 0.06, 1.05); la.rotation.x = -0.12;
-  addBox(g, 0.3, 0.18, 0.34, skin, -0.62, TY + 0.1, 0.58);
-  // 右臂（铬义肢，呼应雇佣兵设定）
-  const ra = addBox(g, 0.34, 0.26, 1.0, sleeve, 0.62, TY + 0.06, 1.05); ra.rotation.x = -0.12;
-  addBox(g, 0.3, 0.2, 0.34, steel, 0.62, TY + 0.1, 0.58);
-  addBox(g, 0.08, 0.08, 0.24, emat(0x2fb9c4, 2), 0.62, TY + 0.22, 0.62);
+  addPart(g, capsule(0.14, 0.62), sleeve, -0.6, TY + 0.05, 1.2, Math.PI / 2.2, 0, 0);   // 左前臂
+  addPart(g, ball(0.15), skin, -0.6, TY + 0.08, 0.74);                                  // 左手
+  addPart(g, capsule(0.14, 0.62), sleeve, 0.6, TY + 0.05, 1.2, Math.PI / 2.2, 0, 0);    // 右前臂(义肢袖)
+  addPart(g, ball(0.15), steel, 0.6, TY + 0.08, 0.74);                                  // 右手(义肢)
+  addPart(g, capsule(0.03, 0.14), emat(0x2fb9c4, 2), 0.6, TY + 0.2, 0.78, Math.PI / 2.2, 0, 0); // 光缝
   return g;
 }
 
@@ -130,7 +134,7 @@ function buildScene() {
   scene.background = new THREE.Color(0x05070c);
   scene.fog = new THREE.Fog(0x05070c, 8, 26);
 
-  camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.1, 100);
+  camera = new THREE.PerspectiveCamera(52, 16 / 9, 0.1, 100);
 
   S.amb = new THREE.AmbientLight(0x1b2740, 1.0); scene.add(S.amb);          // 低环境光（昏暗基调）
   S.topBase = 130;                                                          // 顶光基础强度
@@ -144,16 +148,16 @@ function buildScene() {
   S.flashL = new THREE.PointLight(0xff3b3b, 0, 20, 2); S.flashL.position.set(0, 1.5, 0); scene.add(S.flashL);
 
   buildRoom();
-  // 长桌（沿 Z 摆放，双方隔桌相对）
-  const table = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.5, 3.6), mat(0x1a2230, { metalness: 0.5, roughness: 0.6 }));
-  table.position.set(0, TY - 0.25, -0.5); scene.add(table);
-  const inlay = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.02, 3.4), emat(0x123842, 0.5, 0x0e1620));
-  inlay.position.set(0, TY + 0.005, -0.5); scene.add(inlay);              // 桌面发光内嵌
+  // 长桌（沿 Z 摆放，双方隔桌相对）—— 更大，给桌面陈列留出空间
+  const table = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.5, 4.6), mat(0x1a2230, { metalness: 0.5, roughness: 0.6 }));
+  table.position.set(0, TY - 0.25, -0.7); scene.add(table);
+  const inlay = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.02, 4.4), emat(0x123842, 0.5, 0x0e1620));
+  inlay.position.set(0, TY + 0.005, -0.7); scene.add(inlay);              // 桌面发光内嵌
 
-  S.opp = buildOpponent(); S.opp.position.set(0, 0, OPP_Z); scene.add(S.opp); // 对手坐对面，面朝你(+Z)
+  S.opp = buildOpponent(); S.opp.scale.setScalar(OPP_SCALE); S.opp.position.set(0, 0, OPP_Z); scene.add(S.opp); // 对手坐对面、面朝你(+Z)，体型更大
   S.hands = buildHands(); scene.add(S.hands);                                 // 第一人称双手
 
-  S.gun = buildGun(); S.gun.position.set(0, TY + 0.1, -0.3); scene.add(S.gun);
+  S.gun = buildGun(); S.gun.position.set(0, TY + 0.1, -0.5); scene.add(S.gun);
   S.muzzle = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), emat(0xff6a22, 4, 0xffd9a0));
   S.muzzle.visible = false; scene.add(S.muzzle);
 
@@ -269,7 +273,7 @@ function loop() {
     S.topGain = e; S.amb.intensity = lerp(1.9, 1.0, e);
     const fp = S.intro.fromPos, ft = S.intro.fromTgt;
     camera.position.set(lerp(fp.x, SEAT.x, e), lerp(fp.y, SEAT.y, e), lerp(fp.z, SEAT.z, e));
-    camera.fov = lerp(46, 50, e); camera.updateProjectionMatrix();
+    camera.fov = lerp(46, 52, e); camera.updateProjectionMatrix();
     S.lastLook.set(lerp(ft.x, LOOK.x, e), lerp(ft.y, LOOK.y, e), lerp(ft.z, LOOK.z, e)); camera.lookAt(S.lastLook);
     if (p >= 1) S.intro.active = false;
     renderer.render(scene, camera); return;
@@ -280,8 +284,8 @@ function loop() {
   let ox = 0, oy = 0;
   if (S.shakeT > 0) { S.shakeT -= dt; const m = S.shakeT * S.shakeMag; ox += (Math.random() - 0.5) * m; oy += (Math.random() - 0.5) * m; }
   if (S.zoom > 0.05) { ox += (Math.random() - 0.5) * 0.04 * S.zoom; oy += (Math.random() - 0.5) * 0.04 * S.zoom; }
-  camera.position.set(SEAT.x + ox, SEAT.y + oy - 0.18 * S.zoom, SEAT.z - 1.7 * S.zoom);
-  camera.fov = 50 - 8 * S.zoom; camera.updateProjectionMatrix();
+  camera.position.set(SEAT.x + ox, SEAT.y + oy - 0.18 * S.zoom, SEAT.z - 1.9 * S.zoom);
+  camera.fov = 52 - 9 * S.zoom; camera.updateProjectionMatrix();
   S.lastLook.set(LOOK.x, LOOK.y, LOOK.z); camera.lookAt(S.lastLook);
 
   renderer.render(scene, camera);
@@ -297,12 +301,12 @@ function update3D(v) {
     const hp = v.hp[id], max = v.hpMax;
     for (let i = 0; i < max; i++) {
       const c = new THREE.Mesh(S.cube, i < hp ? S.hpAlive : S.hpDead);
-      c.scale.set(0.75, 1.5, 0.75);
-      c.position.set(-(max - 1) * 0.13 + i * 0.26, TY + 0.14, z);
+      c.scale.set(0.8, 1.5, 0.8);
+      c.position.set(-(max - 1) * 0.15 + i * 0.3, TY + 0.14, z);
       grp.add(c);
     }
   };
-  rowHp(S.hpYou, HUMAN, 1.2); rowHp(S.hpOpp, AI, -1.9);
+  rowHp(S.hpYou, HUMAN, 1.6); rowHp(S.hpOpp, AI, -2.55);
   // 子弹排（桌中央），第一发=当前膛内（扫描过才染色并抬起）
   clearGroup(S.shells);
   const total = v.mag.total;
@@ -310,7 +314,7 @@ function update3D(v) {
     let m = S.brass;
     if (i === 0 && v.currentShell) m = v.currentShell === 'live' ? S.liveMat : S.blankMat;
     const sh = new THREE.Mesh(S.shellGeo, m); sh.rotation.z = Math.PI / 2;
-    sh.position.set(-(total - 1) * 0.11 + i * 0.22, TY + 0.07 + (i === 0 ? 0.05 : 0), 0.5);
+    sh.position.set(-(total - 1) * 0.13 + i * 0.26, TY + 0.07 + (i === 0 ? 0.05 : 0), -0.25);
     S.shells.add(sh);
   }
   // 道具陈列：双方各自摆在自己面前
@@ -319,16 +323,16 @@ function update3D(v) {
     const inv = v.items[id] || [];
     inv.forEach((it, i) => {
       const c = new THREE.Mesh(S.cube, S.itemMat[it] || S.brass);
-      c.position.set(-(inv.length - 1) * 0.15 + i * 0.3, TY + 0.1, z); S.items.add(c);
+      c.position.set(-(inv.length - 1) * 0.18 + i * 0.36, TY + 0.1, z); S.items.add(c);
     });
   };
-  rowItems(HUMAN, 0.9); rowItems(AI, -1.35);
+  rowItems(HUMAN, 1.0); rowItems(AI, -1.95);
 }
 
 // side: 'you'(近/+Z) | 'ai'(对面/-Z)
 function aimGun(side) { S.gunYawTarget = side === 'you' ? 0 : Math.PI; S.gunLift = 0.18; }
 function muzzleFlash(live, side) {
-  const z = side === 'you' ? 0.55 : -1.15;
+  const z = side === 'you' ? 0.7 : -1.6;
   S.muzzle.position.set(0, TY + 0.12, z);
   S.muzzle.scale.setScalar(live ? 1.3 : 0.6);
   S.muzzle.material.emissive.setHex(live ? 0xff5522 : 0x66aacc);
