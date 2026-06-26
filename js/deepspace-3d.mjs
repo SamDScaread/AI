@@ -23,8 +23,10 @@ const TY = 1.0;               // 桌面高度
 const OPP_SCALE = 1.28;       // 对手整体放大
 const SEAT = { x: 0, y: 1.98, z: 4.25 };  // 你的座位（第一人称视角，已后拉以配合更大的桌与对手）
 const LOOK = { x: 0, y: 1.18, z: -1.25 }; // 视线落在桌面与对手之间
-// 放入 assets/models/opponent.glb 后，把 enabled 改为 true 即替换占位角色；其余参数可微调。
-const MODEL = { enabled: false, opponent: '/assets/models/opponent.glb', targetH: 3.4, scaleMul: 1, yOffset: 0, rotY: 0 };
+// 多模型：在 assets/models/manifest.json 里登记多个角色，运行时按清单加载到对面席位。
+let CHARS = [];               // 模型注册表（来自 manifest.json）
+const MODEL_DIR = '/assets/models/';
+const MODEL_TARGET_H = 3.4;   // 默认缩放到的身高（单位）
 const lerp = (a, b, t) => a + (b - a) * t;
 let renderer, scene, camera, clock;
 const S = {};
@@ -249,33 +251,54 @@ function buildScene() {
   clock = new THREE.Clock();
   resize(); window.addEventListener('resize', resize);
   renderer.setAnimationLoop(loop);
-  loadOpponentModel();   // 有 .glb 就替换占位角色，没有则保留几何体小人
+  loadManifest();   // 按清单加载模型，没有就保留几何体小人
 }
 
-// 尝试加载对手 3D 模型；自动缩放到目标高度、双脚落地、水平居中。无文件则静默沿用占位角色。
-function loadOpponentModel() {
-  if (!MODEL.enabled) return; // 未启用：不发请求、保持控制台干净、沿用占位角色
-  fetch(MODEL.opponent)
+// 读取模型清单，并把"对手"角色加载到对面席位；清单为空则沿用占位几何体角色。
+function loadManifest() {
+  fetch(MODEL_DIR + 'manifest.json')
+    .then((r) => (r.ok ? r.json() : null))
+    .then((j) => {
+      if (!j || !Array.isArray(j.characters) || !j.characters.length) return; // 未登记任何模型 -> 占位
+      CHARS = j.characters;
+      const opp = CHARS.find((c) => c.role === 'opponent') || CHARS[0];
+      if (opp) loadCharacter(opp);
+    })
+    .catch(() => { /* 没有清单：沿用占位角色 */ });
+}
+
+// 把注册表中的某个角色加载到对面席位：自动缩放到目标身高、双脚落地、水平居中。
+function loadCharacter(entry) {
+  const url = entry.url || (MODEL_DIR + entry.file);
+  fetch(url)
     .then((r) => (r.ok ? r.arrayBuffer() : null))
     .then((buf) => {
-      if (!buf) return; // 没有模型文件 -> 保留占位几何体
+      if (!buf) { console.warn('找不到模型文件：' + url); return; }
       new GLTFLoader().parse(buf, '', (gltf) => {
         const m = gltf.scene;
-        m.rotation.y = MODEL.rotY;
+        m.rotation.y = entry.rotY || 0;
+        const targetH = entry.targetH || MODEL_TARGET_H;
         let box = new THREE.Box3().setFromObject(m); const size = new THREE.Vector3(); box.getSize(size);
-        m.scale.multiplyScalar((MODEL.targetH / (size.y || 1)) * MODEL.scaleMul);
+        m.scale.multiplyScalar((targetH / (size.y || 1)) * (entry.scale || 1));
         box = new THREE.Box3().setFromObject(m); const c = new THREE.Vector3(); box.getCenter(c);
-        S.oppBase = { y: -box.min.y + MODEL.yOffset, z: OPP_Z };
+        S.oppBase = { y: -box.min.y + (entry.yOffset || 0), z: OPP_Z };
         m.position.set(-c.x, S.oppBase.y, OPP_Z);
-        scene.remove(S.opp); S.opp = m; scene.add(m); S.oppVisor = null;
-        if (gltf.animations && gltf.animations.length) {
-          S.mixer = new THREE.AnimationMixer(m); S.mixer.clipAction(gltf.animations[0]).play();
-        }
-        log('已载入对手 3D 模型。', 'cyan');
-      }, (e) => console.warn('模型解析失败（若用了 Draco/KTX2 压缩，请用未压缩 .glb 重新导出）：', e && e.message ? e.message : e));
+        if (S.opp) scene.remove(S.opp);
+        if (S.mixer) { S.mixer.stopAllAction(); S.mixer = null; }
+        S.opp = m; scene.add(m); S.oppVisor = null;
+        if (gltf.animations && gltf.animations.length) { S.mixer = new THREE.AnimationMixer(m); S.mixer.clipAction(gltf.animations[0]).play(); }
+        log('已载入模型：' + (entry.name || entry.key || '角色'), 'cyan');
+      }, (e) => console.warn('模型解析失败（可能用了 Draco/KTX2 压缩，请用未压缩 .glb 重导）：', e && e.message ? e.message : e));
     })
-    .catch(() => { /* 取模型失败：静默沿用占位角色 */ });
+    .catch(() => { console.warn('加载模型出错：' + url); });
 }
+
+// 对外：按 key 切换对面角色（供将来的"选择对手"/联机同步使用）。
+export function setOpponentCharacter(key) {
+  const e = CHARS.find((c) => c.key === key);
+  if (e) loadCharacter(e);
+}
+export function listCharacters() { return CHARS.map((c) => ({ key: c.key, name: c.name || c.key, role: c.role || 'any' })); }
 
 // 开局：镜头从当前(菜单/故事)位置流畅过渡到座位视角，顶光渐亮、环境光压暗。
 function beginIntro() {
