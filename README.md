@@ -1,8 +1,8 @@
-# 深空轮盘 · Deep-Space Standoff
+# 气闸孤注：γ-7 · AIRLOCK ANTE: GAMMA-7
 
-深空轮盘是一个原创的赛博朋克 1v1 对决游戏：在实弹与空包组成的弹仓前选择瞄准自己或对手。它提供 Three.js 体素风 3D 前端、单人 AI 对局，以及由服务器裁决的 WebSocket 联机模式。
+《气闸孤注：γ-7》是一个原创的赛博朋克 1v1 对决游戏：在实弹与空包组成的弹仓前选择瞄准自己或对手。它提供 Three.js 体素风 3D 前端、单人 AI 对局，以及由服务器裁决的 WebSocket 联机模式。
 
-本仓库的当前主项目是**深空轮盘**；保留的「侠盗猎码」文件属于历史项目，不在当前维护范围内。
+本仓库的当前主项目是**《气闸孤注：γ-7》**；保留的「侠盗猎码」文件属于历史项目，不在当前维护或本次开源发布范围内。
 
 ## 玩法
 
@@ -46,7 +46,7 @@ npm run start:server
 npm test
 ```
 
-默认测试覆盖深空轮盘规则、真实双客户端 WebSocket 流程，以及通用房间/WebSocket 传输层。完整执行历史项目的测试可运行：
+默认测试覆盖《气闸孤注：γ-7》规则、真实双客户端 WebSocket 流程，以及通用房间/WebSocket 传输层。完整执行历史项目的测试可运行：
 
 ```bash
 npm run test:all
@@ -54,7 +54,7 @@ npm run test:all
 
 ## 部署
 
-- 静态前端可部署到 GitHub Pages、Netlify 等静态站点；深空轮盘的资源与模块使用相对路径，兼容 GitHub Pages 的项目子路径。
+- 静态前端可部署到 GitHub Pages、Netlify 等静态站点；《气闸孤注：γ-7》的资源与模块使用相对路径，兼容 GitHub Pages 的项目子路径。
 - WebSocket 服务器可部署到 Render、Railway、Fly.io 或自有 Node 主机，启动命令为 `node server/server.mjs`，健康检查地址为 `/healthz`。
 - HTTPS 页面必须连接 `wss://` 服务端。联机界面会在 HTTPS 页面中默认使用 `wss://`，但部署到独立域名时仍需填写正确的服务器地址。
 
@@ -73,6 +73,17 @@ server/test/                规则、传输层与双客户端集成测试
 docs/                       游戏设计与部署说明
 ```
 
+## 开源与贡献
+
+《气闸孤注：γ-7》的原创代码和文档采用 [MIT 许可证](LICENSE) 开源；适用范围以许可证顶部的说明为准。
+仓库内随附的 Three.js 文件继续遵循其原始 MIT 许可证，详情见
+[第三方组件声明](THIRD_PARTY_NOTICES.md)。
+
+欢迎提交问题和改进。开始前请阅读 [贡献指南](CONTRIBUTING.md)；安全问题请按
+[安全策略](SECURITY.md) 私下报告。
+
 ## 历史项目
 
-仓库中的 `index.html`、`js/interp/`、`js/levels.js`、`tests/` 等「侠盗猎码」文件会继续保留，但不会随深空轮盘迭代而修改；其回归测试仅在 `npm run test:legacy` 或 `npm run test:all` 中运行。
+仓库中的 `index.html`、`css/style.css`、`js/editor.js`、`js/game.js`、`js/i18n.js`、`js/interp/`、
+`js/levels.js` 和 `tests/` 属于保留的「侠盗猎码」历史项目。它们不会随《气闸孤注：γ-7》迭代而修改，
+也不因本次发布而获得新的许可；其回归测试仅在 `npm run test:legacy` 或 `npm run test:all` 中运行。

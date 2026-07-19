@@ -1,4 +1,4 @@
-// 《深空轮盘》主菜单 + 流程编排（入口模块）。
+// 《气闸孤注：γ-7》主菜单 + 流程编排（入口模块）。
 // 负责：标题闸门 -> 首次进入自动播放[背景故事动画]+[新手教程]；主菜单路由
 // （练习难度/联机/故事/教程/鸣谢/反馈/退出）；过场动画引擎；新手弹窗引导；mailto 反馈。
 // 实际对局/3D/音效由 deepspace-3d.mjs 提供，这里只做编排。
@@ -44,7 +44,7 @@ const STORY = [
   { text: '输了……就当替这座站，省下一份氧气。', ms: 3400, cls: 'danger' },
 ];
 const CREDITS = [
-  { text: '《深空轮盘》', ms: 2600, cls: 'title' },
+  { text: '《气闸孤注：γ-7》', ms: 2600, cls: 'title' },
   { text: '游戏设计　SamDScaread', ms: 3000 },
   { text: '程序与美术　Claude', ms: 3000 },
   { text: '献给所有在边缘求生的人。', ms: 3000, cls: 'danger' },
@@ -101,7 +101,7 @@ function openFeedback() {
 }
 function sendFeedback() {
   const body = encodeURIComponent(($('fbText').value || '').slice(0, 4000));
-  const subject = encodeURIComponent('《深空轮盘》玩家反馈');
+  const subject = encodeURIComponent('《气闸孤注：γ-7》玩家反馈');
   window.location.href = `mailto:${FEEDBACK_TO}?subject=${subject}&body=${body}`;
   showMenu();
 }

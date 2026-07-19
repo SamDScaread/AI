@@ -1,7 +1,17 @@
 {
-  "name": "deep-space-standoff",
+  "name": "airlock-ante",
   "version": "1.0.0",
-  "description": "深空轮盘 — 3D 体素风实弹/空包对决，支持单机与权威 WebSocket 联机",
+  "private": true,
+  "description": "气闸孤注：γ-7 — 3D 体素风实弹/空包对决，支持单机与权威 WebSocket 联机",
+  "author": "SamDScaread",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SamDScaread/airlock-ante.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SamDScaread/airlock-ante/issues"
+  },
+  "homepage": "https://github.com/SamDScaread/airlock-ante#readme",
   "scripts": {
     "test": "npm run test:deepspace && npm run test:server",
     "test:all": "npm test && npm run test:legacy",

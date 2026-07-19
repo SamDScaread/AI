@@ -1,4 +1,4 @@
-// 玩法：《深空轮盘》/ Deep-Space Standoff
+// 玩法：《气闸孤注：γ-7》/ Airlock Ante: Gamma-7
 // ----------------------------------------------------------------------------
 // 实弹/空弹轮流对决（机制通用，主题/命名/剧情原创）。本模块是**纯函数式**规则引擎，
 // 不依赖任何 Node API，因此既能跑在 server/ 上做真人联机，也能直接 import 进浏览器
@@ -33,7 +33,7 @@ const ITEM_POOL = {
 const ITEMS_PER_RELOAD = { 1: 1, 2: 1, 3: 2, mercy: 2 };
 
 export const ITEM_META = {
-  smoke:    { label: '万宝路牌香烟', icon: '🚬', desc: '立即回 1 点血（不超过本局上限）' },
+  smoke:    { label: '虚光香烟', icon: '🚬', desc: '立即回 1 点血（不超过本局上限）' },
   scanner:  { label: '扫描仪',       icon: '🔍', desc: '偷看当前这一发是实是空（只有你看到）' },
   ejector:  { label: '退弹器',       icon: '⏏️', desc: '退掉当前这一发、不开枪（会当众暴露）' },
   maglock:  { label: '磁锁',         icon: '🔒', desc: '跳过对手的下一个回合' },
@@ -198,7 +198,7 @@ function fire(state, shooterId, target, events) {
 // ---- 契约实现 ----------------------------------------------------------------
 const game = {
   id: 'deepspace',
-  name: '深空轮盘 / Deep-Space Standoff',
+  name: '气闸孤注：γ-7 / Airlock Ante: Gamma-7',
   minPlayers: 2,
   maxPlayers: 2,
 

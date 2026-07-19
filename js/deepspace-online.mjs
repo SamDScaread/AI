@@ -1,4 +1,4 @@
-// 《深空轮盘》联机大厅：连接服务器、创建/加入房间、准备/开始，然后把对局交给
+// 《气闸孤注：γ-7》联机大厅：连接服务器、创建/加入房间、准备/开始，然后把对局交给
 // deepspace-3d 的 startOnline 来渲染。底层 WebSocket 用通用的 GameClient。
 import { GameClient } from './net/client.mjs';
 import { startOnline } from './deepspace-3d.mjs';

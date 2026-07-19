@@ -1,4 +1,4 @@
-/* 《深空轮盘》3D 体素版布局层。复用 deepspace.css 的配色与组件类（.fighter/.cell/
+/* 《气闸孤注：γ-7》3D 体素版布局层。复用 deepspace.css 的配色与组件类（.fighter/.cell/
    .item/.counts/button/.overlay/#log/#flash 等），这里只负责「全屏画布 + 悬浮 HUD」。 */
 
 #stage { position: fixed; inset: 0; z-index: 1; background: #04050a; }

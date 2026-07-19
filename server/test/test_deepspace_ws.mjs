@@ -1,4 +1,4 @@
-// 真实 socket 集成测试：两名玩家完整走过深空轮盘的建房、加入、准备、开局和第一步操作。
+// 真实 socket 集成测试：两名玩家完整走过《气闸孤注：γ-7》的建房、加入、准备、开局和第一步操作。
 // 除了验证联机链路，也确保服务器下发的玩家视图不泄露私有弹序或随机状态。
 import assert from 'node:assert/strict';
 import net from 'node:net';
@@ -221,7 +221,7 @@ try {
   assert.equal(guestRematchState.view.you, guestJoined.playerId, '再战保持原玩家身份');
   assert.equal(hostRematchState.view.roundWins[hostJoined.playerId], 0, '新局清空战绩');
   assert.equal(guestRematchState.view.roundWins[guestJoined.playerId], 0, '新局清空战绩');
-  console.log('  ✓ 深空轮盘双客户端：建房/加入/准备/开局/行动/同房再战 + 弹序保密');
+  console.log('  ✓ 《气闸孤注：γ-7》双客户端：建房/加入/准备/开局/行动/同房再战 + 弹序保密');
 } finally {
   close(server, [host, guest]);
 }

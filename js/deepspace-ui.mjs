@@ -1,4 +1,4 @@
-// 《深空轮盘》单人 vs AI 的 2D 前端控制器（扁平/低配版）。
+// 《气闸孤注：γ-7》单人 vs AI 的 2D 前端控制器（扁平/低配版）。
 // 直接 import 纯规则引擎、AI 与共享音效引擎（同一套规则将来也能跑联机），整局在浏览器本地推进。
 import game, { ITEM_META } from '../server/games/deepspace.mjs';
 import { decideAction, decideMercy } from './ai/deepspace-ai.mjs';

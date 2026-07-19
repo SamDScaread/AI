@@ -30,5 +30,5 @@ createServer(async (req, res) => {
   }
 }).listen(PORT, () => {
   console.log(`\n  侠盗猎码 Grand Theft Code is live →  http://localhost:${PORT}`);
-  console.log(`  深空轮盘 Deep-Space Standoff   →  http://localhost:${PORT}/deepspace.html\n`);
+  console.log(`  气闸孤注：γ-7 Airlock Ante: Gamma-7   →  http://localhost:${PORT}/deepspace.html\n`);
 });
