@@ -4,10 +4,11 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
 <title>深空轮盘 · γ-7 气闸厅</title>
-<link rel="stylesheet" href="/css/deepspace.css" />
-<link rel="stylesheet" href="/css/deepspace3d.css" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='50' font-size='50'%3E%F0%9F%9A%80%3C/text%3E%3C/svg%3E" />
+<link rel="stylesheet" href="./css/deepspace.css" />
+<link rel="stylesheet" href="./css/deepspace3d.css" />
 <script type="importmap">
-{ "imports": { "three": "/js/vendor/three.module.js" } }
+{ "imports": { "three": "./js/vendor/three.module.js" } }
 </script>
 </head>
 <body>
@@ -55,6 +56,18 @@
       <button id="mCredits">开发人员</button>
       <button id="mFeedback">向设计师反馈</button>
       <button id="mQuit">退出游戏</button>
+    </nav>
+  </div>
+
+  <!-- 单机 AI 难度 -->
+  <div id="difficultyScreen" class="overlay" hidden>
+    <div class="verdict">选择演算强度</div>
+    <p class="flavor">三档对手都只读取公开信息，不会窥视隐藏弹序。</p>
+    <nav class="menu-list">
+      <button id="diffTraining">训练 · 手下留情</button>
+      <button class="grant" id="diffStandard">标准 · 概率博弈</button>
+      <button id="diffHard">猎杀 · 全力演算</button>
+      <button id="diffBack">返回主菜单</button>
     </nav>
   </div>
 
@@ -139,6 +152,6 @@
   <div id="blackout"></div>
 </div>
 
-<script type="module" src="/js/deepspace-menu.mjs"></script>
+<script type="module" src="./js/deepspace-menu.mjs"></script>
 </body>
 </html>

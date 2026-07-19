@@ -87,6 +87,43 @@ test('完整跑一局 Nim 直到分出胜负', () => {
   assert.ok(result.winnerId === aId || result.winnerId === bId, '产生了一个赢家');
 });
 
+test('双方确认后可在同一房间自动再战', () => {
+  const m = new RoomManager(game);
+  const a = fakeConn(); attach(m, a);
+  a.emit('message', { type: C2S.CREATE, name: 'A' });
+  const joinedA = a.recv(S2C.JOINED);
+  const code = joinedA.room;
+  const aId = joinedA.playerId;
+  const b = fakeConn(); attach(m, b);
+  b.emit('message', { type: C2S.JOIN, room: code, name: 'B' });
+  const bId = b.recv(S2C.JOINED).playerId;
+  b.emit('message', { type: C2S.READY, ready: true });
+  a.emit('message', { type: C2S.START });
+
+  let guard = 0;
+  while (!(a.recv(S2C.OVER) || b.recv(S2C.OVER)) && guard++ < 100) {
+    const view = a.recv(S2C.STATE).view;
+    (view.turnId === aId ? a : b).emit('message', { type: C2S.ACTION, action: { take: 1 } });
+  }
+  assert.ok(a.recv(S2C.OVER) || b.recv(S2C.OVER), '第一局正常结束');
+
+  a.emit('message', { type: C2S.REMATCH, ready: true });
+  let pending = a.recv(S2C.REMATCH);
+  assert.equal(pending.room, code, '再战留在原房间');
+  assert.equal(pending.players.find((p) => p.id === aId).rematch, true);
+  assert.equal(pending.players.find((p) => p.id === bId).rematch, false);
+  assert.equal(m.get(code).phase, 'over', '单方确认不能提前开始');
+
+  b.emit('message', { type: C2S.REMATCH, ready: true });
+  const room = m.get(code);
+  assert.equal(room.phase, 'playing', '双方确认后服务器自动开启新局');
+  assert.equal(room.state.pile, 21, '新局恢复初始状态');
+  assert.equal(room.list.find((p) => p.id === aId).rematch, false, '确认状态不泄漏到下一局');
+  assert.equal(room.list.find((p) => p.id === bId).rematch, false);
+  assert.equal(a.recv(S2C.STATE).view.pile, 21);
+  assert.equal(b.recv(S2C.STATE).view.pile, 21);
+});
+
 test('非法操作被拒绝（没轮到 / 取太多）', () => {
   const m = new RoomManager(game);
   const a = fakeConn(); attach(m, a);
@@ -97,6 +134,9 @@ test('非法操作被拒绝（没轮到 / 取太多）', () => {
   b.emit('message', { type: C2S.JOIN, room: code, name: 'B' });
   b.emit('message', { type: C2S.READY, ready: true });
   a.emit('message', { type: C2S.START });
+
+  a.emit('message', { type: C2S.REMATCH, ready: true });
+  assert.equal(a.recv(S2C.ERROR).code, 'not_over', '未结束的对局不能请求再战');
 
   // 开局轮到 A。B 抢着操作 -> not_your_turn
   b.emit('message', { type: C2S.ACTION, action: { take: 1 } });

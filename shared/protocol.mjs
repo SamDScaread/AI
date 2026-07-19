@@ -11,6 +11,7 @@ export const C2S = {
   JOIN:   'join',   // {room, name}      加入已有房间 / join an existing room
   READY:  'ready',  // {ready:Boolean}   大厅里切换准备状态 / toggle ready in the lobby
   START:  'start',  // {}                房主开始对局 / host starts the match
+  REMATCH:'rematch',// {ready:Boolean}   对局结束后确认同房再战 / confirm a rematch
   ACTION: 'action', // {action:{...}}    一次游戏操作 / a game move
   LEAVE:  'leave',  // {}                离开房间 / leave the room
   PING:   'ping',   // {}                心跳 / heartbeat
@@ -23,6 +24,7 @@ export const S2C = {
   STATE:  'state',  // {view}                            该玩家视角下的游戏状态
   EVENT:  'event',  // {event:{...}}                     一次性事件（用于动画/信息流）
   OVER:   'over',   // {winnerId, view}                  对局结束
+  REMATCH:'rematch',// {room, players:[{id,rematch}]}    同房再战确认状态
   ERROR:  'error',  // {code, message}                   操作被拒绝的原因
   PONG:   'pong',   // {}                                心跳回应
 };

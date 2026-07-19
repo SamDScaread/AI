@@ -26,8 +26,8 @@ const REWARD = 1;                          // 普通胜利的奖励（怜悯翻�
 const ITEM_POOL = {
   1: ['scanner', 'overload'],
   2: ['scanner', 'overload', 'smoke', 'ejector'],
-  3: ['scanner', 'overload', 'smoke', 'ejector', 'maglock'],
-  mercy: ['scanner', 'overload', 'smoke', 'ejector', 'maglock'],
+  3: ['scanner', 'overload', 'smoke', 'ejector', 'maglock', 'shield'],
+  mercy: ['scanner', 'overload', 'smoke', 'ejector', 'maglock', 'shield'],
 };
 // 每次装填发给每人的道具数
 const ITEMS_PER_RELOAD = { 1: 1, 2: 1, 3: 2, mercy: 2 };
@@ -38,6 +38,7 @@ export const ITEM_META = {
   ejector:  { label: '退弹器',       icon: '⏏️', desc: '退掉当前这一发、不开枪（会当众暴露）' },
   maglock:  { label: '磁锁',         icon: '🔒', desc: '跳过对手的下一个回合' },
   overload: { label: '过载芯',       icon: '⚡', desc: '本回合这一枪若命中，伤害 ×2' },
+  shield:   { label: '相位护盾',     icon: '🛡️', desc: '抵消下一次受到的 1 点实弹伤害' },
 };
 
 // ---- 内部工具 ----------------------------------------------------------------
@@ -98,6 +99,7 @@ function startRound(state, roundNo, starterId, events) {
     state.items[p.id] = [];
     state.skipNext[p.id] = false;
     state.buff[p.id] = 1;
+    state.shield[p.id] = false;
   }
   state.scanned = {};
   state.turn = state.players.findIndex((p) => p.id === starterId);
@@ -112,6 +114,7 @@ function startMercyDuel(state, events) {
     state.items[p.id] = [];
     state.skipNext[p.id] = false;
     state.buff[p.id] = 1;
+    state.shield[p.id] = false;
   }
   state.scanned = {};
   state.turn = state.players.findIndex((p) => p.id === state.mercyTakerId); // 被赦免者先手
@@ -173,14 +176,20 @@ function fire(state, shooterId, target, events) {
   const victimId = target === 'self' ? shooterId : otherId(state, shooterId);
   const buff = state.buff[shooterId] || 1;
   let damage = 0;
+  let shielded = false;
   if (isLive) {
     damage = buff;
+    if (state.shield[victimId]) {
+      state.shield[victimId] = false;
+      damage = Math.max(0, damage - 1);
+      shielded = true;
+    }
     state.hp[victimId] = Math.max(0, state.hp[victimId] - damage);
   }
   state.buff[shooterId] = 1; // 过载芯只作用这一枪
   events.push({
     kind: 'shoot', by: nameOf(state, shooterId), byId: shooterId, target,
-    shell: isLive ? 'live' : 'blank', damage,
+    shell: isLive ? 'live' : 'blank', damage, shielded,
     victim: nameOf(state, victimId), victimId, hp: { ...state.hp },
   });
   return { isLive, keepTurn: target === 'self' && !isLive, victimId };
@@ -198,7 +207,7 @@ const game = {
       players: players.map((p) => ({ id: p.id, name: p.name })),
       phase: 'duel',
       matchRound: 1,
-      hp: {}, roundWins: {}, credits: {}, items: {}, skipNext: {}, buff: {}, scanned: {},
+      hp: {}, roundWins: {}, credits: {}, items: {}, skipNext: {}, buff: {}, shield: {}, scanned: {},
       reloadCount: 0, mag: null, turn: 0,
       matchWinnerId: null, matchLoserId: null, mercyGiverId: null, mercyTakerId: null,
       winnerId: null,
@@ -288,6 +297,7 @@ const game = {
       itemPool: ITEM_POOL[phaseKey(state)],
       skipNext: { ...state.skipNext },
       buff: { ...state.buff },
+      shield: { ...state.shield },
       mercyChoiceFor: state.phase === 'mercy_choice' ? state.matchWinnerId : null,
       mercyGiverId: state.mercyGiverId,
       winnerId: state.winnerId,
@@ -326,6 +336,11 @@ function applyItem(state, playerId, item, events) {
       break;
     case 'overload':
       state.buff[playerId] = 2;
+      events.push({ kind: 'item', by: nameOf(state, playerId), item });
+      break;
+    case 'shield':
+      if (state.shield[playerId]) throw { code: 'shield_active', message: '相位护盾已经展开。' };
+      state.shield[playerId] = true;
       events.push({ kind: 'item', by: nameOf(state, playerId), item });
       break;
     default:

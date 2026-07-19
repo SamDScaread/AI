@@ -1,12 +1,12 @@
 // 浏览器端联网层 / Browser-side networking layer.
 // 用法 / Usage:
-//   import { GameClient } from '/js/net/client.mjs';
+//   import { GameClient } from './net/client.mjs';
 //   const c = new GameClient('ws://localhost:3001');
 //   c.on('lobby', (m) => render(m)).on('error', (m) => alert(m.message));
 //   await c.connect();
 //   c.create('我的名字');           // 或 c.join('ABCD', '我的名字')
 //   c.ready(true); c.start(); c.action({ take: 2 });
-import { C2S, S2C } from '/shared/protocol.mjs';
+import { C2S, S2C } from '../../shared/protocol.mjs';
 
 export class GameClient {
   constructor(url) {
@@ -56,6 +56,7 @@ export class GameClient {
   join(room, name) { this._send({ type: C2S.JOIN, room, name }); }
   ready(v) { this._send({ type: C2S.READY, ready: v }); }
   start() { this._send({ type: C2S.START }); }
+  rematch(ready = true) { this._send({ type: C2S.REMATCH, ready }); }
   action(action) { this._send({ type: C2S.ACTION, action }); }
   leave() { this._send({ type: C2S.LEAVE }); }
   disconnect() { clearInterval(this._hb); if (this.ws) this.ws.close(); }

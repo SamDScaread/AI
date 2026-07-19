@@ -44,6 +44,7 @@
 #oppPanel .nm { color: var(--cyan); }
 #hud .fighter .tag { color: var(--dim); font-size: 9px; letter-spacing: .2em; }
 #hud .fighter .hpnum { color: var(--amber); font-size: 12px; }
+#hud .fighter .shield { color: #7fc2ff; font-size: 10px; letter-spacing: .08em; text-shadow: 0 0 9px rgba(85,168,255,.8); }
 #hud .fighter.turn { border-color: var(--red); box-shadow: 0 0 18px var(--glow-r); }
 #hud .fighter.opp.turn { border-color: var(--cyan); box-shadow: 0 0 18px var(--glow-c); }
 

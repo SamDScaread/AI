@@ -5,6 +5,10 @@ import { PHASE } from '../../shared/protocol.mjs';
 // 去掉易混淆字符(0/O/1/I) 的房间码字符集。
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const makeCode = (n = 4) => Array.from({ length: n }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
+const normalizeName = (name, id) => {
+  const text = String(name ?? '').replace(/\s+/g, ' ').trim().slice(0, 20);
+  return text || `Player${id}`;
+};
 
 let nextPlayerId = 1;
 
@@ -22,8 +26,8 @@ export class Room {
   add(name, conn) {
     const id = nextPlayerId++;
     const host = this.players.size === 0;            // 第一个进来的人当房主
-    const clean = String(name || `Player${id}`).slice(0, 20);
-    const player = { id, name: clean, ready: false, host, conn };
+    const clean = normalizeName(name, id);
+    const player = { id, name: clean, ready: false, rematch: false, host, conn };
     this.players.set(id, player);
     return player;
   }

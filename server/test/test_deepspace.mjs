@@ -2,12 +2,24 @@
 // 覆盖开枪/道具/装填递增/三局递减血量/怜悯决战/隐藏弹序/非法操作。
 import assert from 'assert';
 import game, { ITEM_META } from '../games/deepspace.mjs';
-import { decideAction, decideMercy } from '../../js/ai/deepspace-ai.mjs';
+import { decideAction, decideMercy, decideActionHard, decideMercyHard } from '../../js/ai/deepspace-ai.mjs';
 
 const PLAYERS = [{ id: 'A', name: '阿尔法' }, { id: 'B', name: '贝塔' }];
 const fresh = (seed = 1) => game.createInitialState(PLAYERS, { seed });
 const act = (s, id, action) => game.applyAction(s, id, action); // -> { state, events }
 const cur = (s) => s.mag.seq[s.mag.idx]; // 当前膛内是否实弹（测试可读私有真相）
+const aiView = ({ items = [], live = 2, blank = 3, myHp = 4, oppHp = 4,
+  shell = null, shield = false, buff = 1, locked = false } = {}) => ({
+  you: 'A', opponent: 'B',
+  items: { A: items, B: [] },
+  mag: { liveLeft: live, blankLeft: blank },
+  hp: { A: myHp, B: oppHp }, hpMax: 4,
+  shield: { A: shield, B: false },
+  buff: { A: buff, B: 1 },
+  skipNext: { A: false, B: locked },
+  currentShell: shell,
+  roundWins: { A: 2, B: 0 },
+});
 
 let passed = 0;
 function test(name, fn) { fn(); passed++; console.log('  ✓', name); }
@@ -114,6 +126,31 @@ test('香烟回血但不超过本局上限', () => {
   assert.equal(s.hp.A, 4, '不超过第一局上限 4');
 });
 
+test('相位护盾抵消一次伤害，过载命中仍会穿透 1 点', () => {
+  let s = fresh();
+  s.turn = 0; s.hp.A = 2; s.items.A = ['shield'];
+  ({ state: s } = act(s, 'A', { type: 'item', item: 'shield' }));
+  assert.equal(s.shield.A, true, '护盾展开');
+  assert.equal(game.viewFor(s, 'B').shield.A, true, '护盾状态对双方公开');
+  s.items.A = ['shield'];
+  throws(() => act(s, 'A', { type: 'item', item: 'shield' }), 'shield_active');
+
+  s.turn = 1; s.mag.seq = [true, false, false, false, false]; s.mag.idx = 0;
+  let events;
+  ({ state: s, events } = act(s, 'B', { type: 'shoot', target: 'opponent' }));
+  assert.equal(s.hp.A, 2, '普通实弹被护盾完全抵消');
+  assert.equal(s.shield.A, false, '护盾只生效一次');
+  assert.equal(events.find((e) => e.kind === 'shoot').damage, 0);
+  assert.equal(events.find((e) => e.kind === 'shoot').shielded, true);
+
+  s.turn = 1; s.hp.A = 2; s.shield.A = true; s.items.B = ['overload'];
+  s.mag.seq = [true, false, false, false, false]; s.mag.idx = 0;
+  ({ state: s } = act(s, 'B', { type: 'item', item: 'overload' }));
+  ({ state: s, events } = act(s, 'B', { type: 'shoot', target: 'opponent' }));
+  assert.equal(s.hp.A, 1, '2 点过载伤害被抵消 1 点后仍承受 1 点');
+  assert.equal(events.find((e) => e.kind === 'shoot').damage, 1);
+});
+
 test('弹仓打空后重新装填，实弹递增空弹递减', () => {
   let s = fresh();
   assert.equal(s.reloadCount, 1); // 开局已装第一仓
@@ -176,6 +213,15 @@ test('三局递减血量：开新局血量按 4→3→2 下降', () => {
   assert.equal(s.matchRound, 3);
   assert.equal(s.hp.A, 2);
   assert.equal(s.hp.B, 2, '决胜局 2 血');
+});
+
+test('相位护盾会在每一局开始时重置', () => {
+  let s = fresh(7);
+  s.shield.A = true; s.shield.B = false;
+  s = forceRoundEnd(s, 'A', 'B');
+  assert.equal(s.matchRound, 2);
+  assert.equal(s.shield.A, false);
+  assert.equal(s.shield.B, false);
 });
 
 test('整场打完进入怜悯抉择，胜者拿下两局', () => {
@@ -246,8 +292,61 @@ test('applyAction 不改动原 state（结构化克隆）', () => {
 });
 
 test('道具元数据齐全', () => {
-  for (const k of ['smoke', 'scanner', 'ejector', 'maglock', 'overload']) {
+  for (const k of ['smoke', 'scanner', 'ejector', 'maglock', 'overload', 'shield']) {
     assert.ok(ITEM_META[k] && ITEM_META[k].label && ITEM_META[k].icon, `${k} 有元数据`);
+  }
+});
+
+test('猎杀 AI 会优先兑现回血、护盾与扫描收益', () => {
+  assert.deepStrictEqual(
+    decideActionHard(aiView({ items: ['smoke'], myHp: 3 })),
+    { type: 'item', item: 'smoke' },
+  );
+  assert.deepStrictEqual(
+    decideActionHard(aiView({ items: ['shield'], myHp: 2 })),
+    { type: 'item', item: 'shield' },
+  );
+  assert.deepStrictEqual(
+    decideActionHard(aiView({ items: ['scanner'] })),
+    { type: 'item', item: 'scanner' },
+  );
+});
+
+test('猎杀 AI 根据已知弹与概率选择攻击方式', () => {
+  assert.deepStrictEqual(
+    decideActionHard(aiView({ items: ['overload'], shell: 'live', oppHp: 3 })),
+    { type: 'item', item: 'overload' },
+  );
+  assert.deepStrictEqual(
+    decideActionHard(aiView({ shell: 'blank' })),
+    { type: 'shoot', target: 'self' },
+  );
+  assert.deepStrictEqual(
+    decideActionHard(aiView({ live: 1, blank: 4 })),
+    { type: 'shoot', target: 'self' },
+  );
+  assert.deepStrictEqual(
+    decideActionHard(aiView({ live: 4, blank: 1 })),
+    { type: 'shoot', target: 'opponent' },
+  );
+});
+
+test('猎杀 AI 会拒绝怜悯赌局', () => {
+  assert.equal(decideMercyHard(aiView()), 'decline');
+});
+
+test('猎杀 AI 对 AI 能把整场打到结束', () => {
+  for (let seed = 1; seed <= 20; seed++) {
+    let s = fresh(seed); let steps = 0;
+    while (!game.result(s).over) {
+      assert.ok(steps++ < 4000, `hard seed ${seed} 疑似死循环`);
+      if (s.phase === 'mercy_choice') {
+        ({ state: s } = act(s, s.matchWinnerId, { type: 'mercy', choice: decideMercyHard() }));
+      } else {
+        const id = s.players[s.turn].id;
+        ({ state: s } = act(s, id, decideActionHard(game.viewFor(s, id))));
+      }
+    }
   }
 });
 

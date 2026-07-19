@@ -3,10 +3,10 @@
 // 开枪慢动作 + 命中喷血 + 受伤黑屏闪烁 + 主角叹气 + 漂浮尘埃/屏幕故障/血雾环境氛围。
 // 游戏规则引擎、AI、恐怖音效全部原样复用（与 2D 版同源）。
 import * as THREE from 'three';
-import { GLTFLoader } from '/js/vendor/GLTFLoader.js';
-import game, { ITEM_META } from '/server/games/deepspace.mjs';
-import { decideAction, decideMercy, decideActionDumb } from '/js/ai/deepspace-ai.mjs';
-import { AudioKit } from '/js/deepspace-audio.mjs';
+import { GLTFLoader } from './vendor/GLTFLoader.js';
+import game, { ITEM_META } from '../server/games/deepspace.mjs';
+import { decideAction, decideMercy, decideActionDumb, decideActionHard, decideMercyHard } from './ai/deepspace-ai.mjs';
+import { AudioKit } from './deepspace-audio.mjs';
 
 const HUMAN = 'you';
 const AI = 'ai';
@@ -25,7 +25,7 @@ const SEAT = { x: 0, y: 1.98, z: 4.25 };  // 你的座位（第一人称视角�
 const LOOK = { x: 0, y: 1.18, z: -1.25 }; // 视线落在桌面与对手之间
 // 多模型：在 assets/models/manifest.json 里登记多个角色，运行时按清单加载到对面席位。
 let CHARS = [];               // 模型注册表（来自 manifest.json）
-const MODEL_DIR = '/assets/models/';
+const MODEL_DIR = new URL('../assets/models/', import.meta.url).href;
 const MODEL_TARGET_H = 3.4;   // 默认缩放到的身高（单位）
 const lerp = (a, b, t) => a + (b - a) * t;
 let renderer, scene, camera, clock;
@@ -224,7 +224,7 @@ function buildScene() {
   S.itemMat = {
     smoke: emat(0xd9a441, 1.6, 0x2a1d06), scanner: emat(0x2fb9c4, 1.6, 0x06262c),
     ejector: emat(0xc8d0d8, 1.4, 0x1c2026), maglock: emat(0xe2304a, 1.6, 0x2a0810),
-    overload: emat(0xc24fce, 1.6, 0x270a2c),
+    overload: emat(0xc24fce, 1.6, 0x270a2c), shield: emat(0x55a8ff, 1.8, 0x08213a),
   };
   S.cube = new THREE.BoxGeometry(0.18, 0.18, 0.18);
   S.hpYou = new THREE.Group(); S.hpOpp = new THREE.Group(); S.shells = new THREE.Group(); S.items = new THREE.Group();
@@ -480,7 +480,7 @@ function injury() {
 function glitch() { const g = $('glitch'); g.classList.remove('on'); void g.offsetWidth; g.classList.add('on'); setTimeout(() => g.classList.remove('on'), 220); }
 
 // ============================================================ 游戏循环
-let state = null, aiBusy = false, lastEnd = null;
+let state = null, aiBusy = false, inputLocked = false, lastEnd = null;
 // 由菜单/教程注入的可调项
 let aiDecide = decideAction, aiMercyFn = decideMercy, afterStepHook = null, onReturnToMenu = null, curOpts = {};
 // 联机状态：online=true 时渲染由服务器回传的视图/事件驱动；lastView 是当前渲染所用视图。
@@ -508,7 +508,7 @@ function applyStep(id, action) {
 }
 
 async function humanAct(action) {
-  if (aiBusy) return;
+  if (aiBusy || inputLocked) return;
   const v = viewHuman();
   if (v.turnId !== HUMAN || (state.phase !== 'duel' && state.phase !== 'mercy_duel')) return;
   if (action.type === 'shoot') {
@@ -522,6 +522,7 @@ async function humanAct(action) {
 
 // 统一的玩家操作入口：联机时发往服务器（效果由回传事件驱动），单机走本地逻辑。
 function playerAct(action) {
+  if (inputLocked) return;
   if (online) {
     if (!lastView || lastView.turnId !== 'you' || (lastView.phase !== 'duel' && lastView.phase !== 'mercy_duel')) return;
     setControls(false);
@@ -538,6 +539,7 @@ async function runAi() {
   if (aiBusy) return; aiBusy = true; setControls(false);
   try {
     while (true) {
+      if (inputLocked) break;
       if (state.phase === 'finished') break;
       if (state.phase === 'mercy_choice') {
         if (state.matchWinnerId !== AI) break;
@@ -557,6 +559,7 @@ async function runAi() {
 
 function sync() {
   render(viewHuman());
+  if (inputLocked) { setControls(false); return; }
   if (state.phase === 'finished') return showEnd();
   if (state.phase === 'mercy_choice') {
     if (state.matchWinnerId === HUMAN) return showMercy();
@@ -597,14 +600,24 @@ function renderFighter(elId, v, id, isYou) {
   const el = $(elId);
   el.classList.toggle('turn', v.turnId === id && (v.phase === 'duel' || v.phase === 'mercy_duel'));
   const nm = (v._names && v._names[id]) || (id === HUMAN ? '你' : '仲裁者');
-  el.innerHTML = `<span class="nm">${nm}</span><span class="tag">${isYou ? 'EDGERUNNER' : 'ARBITER'}</span><span class="hpnum">♥ ${v.hp[id]}/${v.hpMax}</span>`;
+  // 联机昵称来自服务端下发的状态，用 textContent 避免被解析为页面标记。
+  const name = document.createElement('span');
+  name.className = 'nm'; name.textContent = nm;
+  const tag = document.createElement('span');
+  tag.className = 'tag'; tag.textContent = isYou ? 'EDGERUNNER' : 'ARBITER';
+  const hp = document.createElement('span');
+  hp.className = 'hpnum'; hp.textContent = `♥ ${v.hp[id]}/${v.hpMax}`;
+  const shield = document.createElement('span');
+  shield.className = 'shield'; shield.textContent = '🛡 护盾';
+  shield.hidden = !(v.shield && v.shield[id]);
+  el.replaceChildren(name, tag, hp, shield);
 }
 
 function renderItemBar(v) {
   const bar = $('itemBar');
   if (!v) { bar.innerHTML = ''; return; }
   const inv = v.items[HUMAN] || [];
-  const yourTurn = v.turnId === HUMAN && (v.phase === 'duel' || v.phase === 'mercy_duel') && !aiBusy;
+  const yourTurn = v.turnId === HUMAN && (v.phase === 'duel' || v.phase === 'mercy_duel') && !aiBusy && !inputLocked;
   if (!inv.length) { bar.innerHTML = ''; return; }
   bar.innerHTML = inv.map((it) => {
     const m = ITEM_META[it];
@@ -614,6 +627,7 @@ function renderItemBar(v) {
 }
 
 function setControls(enabled) {
+  enabled = enabled && !inputLocked && !aiBusy;
   $('controls').setAttribute('aria-disabled', String(!enabled));
   $('shootSelf').disabled = !enabled; $('shootOpp').disabled = !enabled;
   renderItemBar(lastView);
@@ -629,9 +643,17 @@ function handleEvent(ev) {
       const sSide = ev.byId === HUMAN ? 'you' : 'ai';
       aimGun(vSide); muzzleFlash(live, vSide);
       if (live) {
-        audio.bang(); audio.hit(); camShake(0.9); flash('hit'); S.flinch[vSide] = 0.3; spawnBlood(vSide);
-        if (vSide === 'you') injury();
-        log(`${ev.by} 抵住${tgt}扣下扳机 —— 实弹炸响，命中${vSide === 'you' ? '你' : '对手'}！`, 'live');
+        const fullyAbsorbed = ev.shielded && ev.damage === 0;
+        audio.bang(); camShake(fullyAbsorbed ? 0.35 : 0.9);
+        if (fullyAbsorbed) {
+          audio.beep(); flash('blank');
+          log(`${ev.by} 抵住${tgt}扣下扳机 —— 实弹撞上相位护盾，伤害被吸收。`, 'cyan');
+        } else {
+          audio.hit(); flash('hit'); S.flinch[vSide] = 0.3; spawnBlood(vSide);
+          if (vSide === 'you') injury();
+          const shield = ev.shielded ? ' 相位护盾吸收了 1 点伤害。' : '';
+          log(`${ev.by} 抵住${tgt}扣下扳机 —— 实弹炸响，命中${vSide === 'you' ? '你' : '对手'}！${shield}`, 'live');
+        }
       } else {
         audio.click(); camShake(0.18); flash('blank');
         if (vSide === 'you') audio.sigh('relief');          // 空枪没打中自己 -> 长舒一口气
@@ -672,7 +694,13 @@ function flash(kind) { const f = $('flash'); f.className = ''; void f.offsetWidt
 let logLines = [];
 function log(text, cls) {
   logLines.push({ text, cls }); logLines = logLines.slice(-8);
-  $('log').innerHTML = logLines.map((l, i) => `<div class="ln ${l.cls} ${i === logLines.length - 1 ? 'fresh' : ''}">${l.text}</div>`).join('');
+  const nodes = logLines.map((line, i) => {
+    const node = document.createElement('div');
+    node.className = `ln ${line.cls} ${i === logLines.length - 1 ? 'fresh' : ''}`;
+    node.textContent = line.text;
+    return node;
+  });
+  $('log').replaceChildren(...nodes);
 }
 
 // ============================================================ 覆盖层
@@ -692,7 +720,7 @@ function showEnd() {
   else if (won) flavor = '舱门嘶鸣着打开。你踏过冷却的枪管，走向下一段黑暗。';
   else flavor = '红光熄灭。站务核心记录：编号已注销。';
   const buttons = online
-    ? `<button class="grant" id="toMenuBtn">返回主菜单</button>`
+    ? `<button class="grant" id="rematchBtn">确认同房再战</button><button id="toMenuBtn">返回主菜单</button>`
     : `<button class="grant" id="againBtn">再入气闸</button><button id="toMenuBtn">返回主菜单</button>`;
   $('endScreen').innerHTML = `
     <div class="verdict ${won ? 'win' : 'lose'}">${won ? '你 活 着' : '你 死 在 了 这 里'}</div>
@@ -701,6 +729,12 @@ function showEnd() {
     <div class="mercy-actions">${buttons}</div>`;
   $('endScreen').hidden = false;
   if (!online) $('againBtn').onclick = () => { hideOverlays(); startMatch(curOpts); };
+  if (online) $('rematchBtn').onclick = () => {
+    const button = $('rematchBtn');
+    button.disabled = true; button.textContent = '已确认，等待对手…';
+    $('hint').textContent = '再战申请已发送，等待对手确认……';
+    net.rematch();
+  };
   $('toMenuBtn').onclick = () => { hideOverlays(); $('hud').hidden = true; if (online) leaveOnline(); if (onReturnToMenu) onReturnToMenu(); };
 }
 
@@ -715,7 +749,7 @@ function remapView(view) {
     ...view, you: 'you', opponent: 'ai',
     hp: pick(view.hp), roundWins: pick(view.roundWins), credits: pick(view.credits),
     items: { you: (view.items && view.items[me]) || [], ai: (view.items && view.items[op]) || [] },
-    skipNext: pick(view.skipNext), buff: pick(view.buff),
+    skipNext: pick(view.skipNext), buff: pick(view.buff), shield: pick(view.shield),
     turnId: view.turnId != null ? M(view.turnId) : null,
     mercyChoiceFor: view.mercyChoiceFor != null ? M(view.mercyChoiceFor) : null,
     winnerId: view.winnerId != null ? M(view.winnerId) : null,
@@ -738,16 +772,39 @@ export function startOnline({ client, myId, onFirstState }) {
   let q = Promise.resolve();
   const enq = (fn) => { q = q.then(fn).catch((e) => console.error(e)); };
   client.on('state', (m) => enq(async () => {
-    if (firstState) { firstState = false; $('log').innerHTML = ''; $('hud').hidden = false; beginIntro(); if (onFirstState) onFirstState(); }
+    const isNewMatch = firstState || lastView?.phase === 'finished';
+    if (isNewMatch) {
+      lastEnd = null; logLines = []; $('log').replaceChildren();
+      if (firstState) {
+        firstState = false; $('hud').hidden = false; beginIntro(); if (onFirstState) onFirstState();
+      } else {
+        hideOverlays();
+      }
+    }
     netMe = m.view.you; netOpp = m.view.opponent; const v = remapView(m.view); render(v); onlineControls(v);
   }));
   client.on('event', (m) => enq(async () => { const ev = remapEvent(m.event); if (ev.kind === 'shoot') await preShot(ev.victimId === 'you' ? 'you' : 'ai'); handleEvent(ev); }));
   client.on('over', (m) => enq(async () => { netMe = m.view.you; netOpp = m.view.opponent; render(remapView(m.view)); showEnd(); }));
+  client.on('rematch', (m) => {
+    const mine = m.players.find((p) => p.id === netMe);
+    const allReady = m.players.length > 0 && m.players.every((p) => p.rematch);
+    const button = $('rematchBtn');
+    if (button && mine?.rematch) { button.disabled = true; button.textContent = '已确认，等待对手…'; }
+    if (allReady) $('hint').textContent = '双方确认，再次装填中……';
+    else if (mine?.rematch) $('hint').textContent = '再战申请已发送，等待对手确认……';
+    else $('hint').textContent = '对手已确认再战。准备好就按下确认。';
+  });
+  client.on('error', (m) => {
+    const button = $('rematchBtn');
+    if (button) { button.disabled = false; button.textContent = '确认同房再战'; }
+    if (m.message) $('hint').textContent = m.message;
+  });
   client.on('disconnected', () => { if (online) { online = false; $('hud').hidden = true; hideOverlays(); if (onReturnToMenu) onReturnToMenu(); } });
 }
 export function leaveOnline() { if (net) { try { net.leave(); net.disconnect(); } catch { /* ignore */ } } online = false; net = null; }
 
 function onlineControls(v) {
+  if (inputLocked) { setControls(false); return; }
   if (v.phase === 'finished') return;
   if (v.phase === 'mercy_choice') {
     if (v.mercyChoiceFor === 'you') showMercy();
@@ -764,6 +821,12 @@ function onlineControls(v) {
 export { audio };
 export function setReturnHandler(fn) { onReturnToMenu = fn; }
 export function setStoryCam(on) { if (S) S.storyCam = !!on; } // 背景故事/鸣谢时的电影运镜开关
+export function setTutorialLock(locked) {
+  inputLocked = !!locked;
+  if (inputLocked) { setControls(false); return; }
+  if (online) { if (lastView) onlineControls(lastView); }
+  else if (state) sync();
+}
 
 export function initGame() {
   buildScene();
@@ -773,11 +836,13 @@ export function initGame() {
   $('mercyExec').onclick = () => chooseMercy('decline');
 }
 
-// opts: { dumb?:bool, onStep?:(view,events)=>void }  —— 启动一局单机对局
+// opts: { difficulty?:'training'|'standard'|'hard', dumb?:bool, onStep?:(view,events)=>void }
+// dumb 为旧教程入口保留，等同 training。
 export function startMatch(opts = {}) {
-  online = false; net = null; curOpts = opts;
-  aiDecide = opts.dumb ? decideActionDumb : decideAction;
-  aiMercyFn = opts.dumb ? () => 'decline' : decideMercy;
+  online = false; net = null; inputLocked = false; curOpts = opts;
+  const difficulty = opts.dumb ? 'training' : (opts.difficulty || 'standard');
+  aiDecide = difficulty === 'training' ? decideActionDumb : difficulty === 'hard' ? decideActionHard : decideAction;
+  aiMercyFn = difficulty === 'hard' ? decideMercyHard : difficulty === 'training' ? () => 'decline' : decideMercy;
   afterStepHook = opts.onStep || null;
   hideOverlays();
   $('hud').hidden = false;

@@ -13,6 +13,7 @@ export function decideAction(view) {
   const myHp = view.hp[me];
   const oppHp = view.hp[opp];
   const hpMax = view.hpMax;
+  const shielded = !!(view.shield && view.shield[me]);
   const known = view.currentShell; // 'live' | 'blank' | null
 
   // 已知是空弹：朝自己开（安全且保留回合）。能补血就先补。
@@ -27,6 +28,9 @@ export function decideAction(view) {
     if (inv.includes('maglock') && oppHp <= 2) return { type: 'item', item: 'maglock' };
     return { type: 'shoot', target: 'opponent' };
   }
+
+  // 残血时先展开护盾，避免下一发实弹直接带走；护盾会抵消 1 点伤害。
+  if (inv.includes('shield') && !shielded && myHp <= 1) return { type: 'item', item: 'shield' };
 
   // 未知：高风险时先用扫描仪看一眼。
   const wantsScan = myHp <= 1 || total <= 3 || liveLeft >= blankLeft;
@@ -51,6 +55,45 @@ export function decideMercy(view) {
   const oppWins = view.roundWins[view.opponent];
   return myWins >= 2 && oppWins === 0 ? 'grant' : 'decline';
 }
+
+// 「猎杀 AI」：仍然只读取自己的公开视图，但会更彻底地利用无回合消耗的道具，
+// 并只在空弹概率足够高时才把枪口转向自己。
+export function decideActionHard(view) {
+  const me = view.you;
+  const opp = view.opponent;
+  const inv = view.items[me] || [];
+  const { liveLeft, blankLeft } = view.mag;
+  const total = liveLeft + blankLeft;
+  const myHp = view.hp[me];
+  const oppHp = view.hp[opp];
+  const hpMax = view.hpMax;
+  const shielded = !!(view.shield && view.shield[me]);
+  const boosted = ((view.buff && view.buff[me]) || 1) > 1;
+  const known = view.currentShell;
+  const has = (item) => inv.includes(item);
+
+  // 回血、护盾与扫描都不交出回合，猎杀档会优先把这些确定收益兑现。
+  if (has('smoke') && myHp < hpMax) return { type: 'item', item: 'smoke' };
+  if (has('shield') && !shielded && myHp <= 2) return { type: 'item', item: 'shield' };
+  if (known == null && has('scanner')) return { type: 'item', item: 'scanner' };
+
+  if (known === 'blank') return { type: 'shoot', target: 'self' };
+  if (known === 'live') {
+    if (has('overload') && !boosted && oppHp >= 2) return { type: 'item', item: 'overload' };
+    const damage = boosted ? 2 : 1;
+    const locked = !!(view.skipNext && view.skipNext[opp]);
+    if (has('maglock') && !locked && oppHp > damage) return { type: 'item', item: 'maglock' };
+    return { type: 'shoot', target: 'opponent' };
+  }
+
+  const pLive = total ? liveLeft / total : 0;
+  if (has('ejector') && myHp <= 1 && pLive >= 0.6) return { type: 'item', item: 'ejector' };
+  if (has('overload') && !boosted && pLive >= 0.65 && oppHp >= 2) return { type: 'item', item: 'overload' };
+  return { type: 'shoot', target: pLive <= 0.35 ? 'self' : 'opponent' };
+}
+
+// 猎杀档不接受怜悯赌局，优先锁定已经到手的胜利。
+export function decideMercyHard() { return 'decline'; }
 
 // 「笨 AI」：新手教程专用的好对付对手。从不用道具、从不扫描；弹序未知时大概率朝自己开枪
 // （经常把实弹送给自己），只在已知时才做合理反应。容易被新手打赢。

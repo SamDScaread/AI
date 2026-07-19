@@ -1,12 +1,12 @@
 {
-  "name": "multiplayer-game-server",
+  "name": "deep-space-server",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "零依赖的实时多人游戏服务器骨架（手写 WebSocket）。Dependency-free realtime multiplayer game server skeleton.",
+  "description": "深空轮盘的零依赖权威 WebSocket 服务器。",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node test/test_server.mjs && node test/test_ws_smoke.mjs"
+    "test": "node test/test_deepspace.mjs && node test/test_deepspace_ws.mjs && node test/test_server.mjs && node test/test_ws_smoke.mjs"
   },
   "license": "MIT"
 }

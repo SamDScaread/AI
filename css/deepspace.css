@@ -115,6 +115,7 @@ button:disabled { opacity: .28; cursor: not-allowed; }
 .fighter .who .tag { font-size: 10px; color: var(--dim); letter-spacing: .2em; text-transform: uppercase; }
 
 .hp { display: flex; gap: 7px; margin-top: 10px; }
+.shield-status { display: inline-block; margin-top: 9px; color: #7fc2ff; font-size: 11px; letter-spacing: .08em; text-shadow: 0 0 9px rgba(85,168,255,.75); }
 .cell {
   width: 26px; height: 14px; border: 1px solid var(--red-d);
   background: #150509; transform: skewX(-18deg);

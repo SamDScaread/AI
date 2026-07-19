@@ -14,6 +14,12 @@ export const lobbyMsg = (room) => ({
   players: room.list.map((p) => ({ id: p.id, name: p.name, ready: p.ready, host: p.host })),
 });
 
+export const rematchMsg = (room) => ({
+  type: S2C.REMATCH,
+  room: room.code,
+  players: room.list.map((p) => ({ id: p.id, rematch: p.rematch })),
+});
+
 // 按每个玩家各自的视角下发状态（关键：隐藏信息在这里被裁剪）。
 export function sendState(room) {
   for (const p of room.players.values()) {
@@ -24,6 +30,10 @@ export function sendState(room) {
 export function startGame(room) {
   room.state = room.game.createInitialState(room.list.map((p) => ({ id: p.id, name: p.name })));
   room.phase = PHASE.PLAYING;
+  for (const p of room.players.values()) {
+    p.ready = false;
+    p.rematch = false;
+  }
   room.broadcast(lobbyMsg(room));
   sendState(room);
 }
@@ -79,6 +89,7 @@ export function attach(manager, conn) {
 
         case C2S.READY: {
           if (!ctx.player) return fail('no_room', '请先加入一个房间。');
+          if (ctx.room.phase !== PHASE.LOBBY) return fail('not_lobby', '对局开始后不能更改准备状态。');
           ctx.player.ready = !!msg.ready;
           ctx.room.broadcast(lobbyMsg(ctx.room));
           break;
@@ -92,6 +103,17 @@ export function attach(manager, conn) {
           if (room.players.size < room.game.minPlayers) return fail('too_few', `至少需要 ${room.game.minPlayers} 名玩家。`);
           if (!room.list.every((p) => p.ready || p.host)) return fail('not_ready', '所有人都准备好才能开始。');
           startGame(room);
+          break;
+        }
+
+        case C2S.REMATCH: {
+          const room = ctx.room;
+          if (!room) return fail('no_room', '请先加入一个房间。');
+          if (room.phase !== PHASE.OVER) return fail('not_over', '只有对局结束后才能请求再战。');
+          if (room.players.size < room.game.minPlayers) return fail('too_few', `至少需要 ${room.game.minPlayers} 名玩家。`);
+          ctx.player.rematch = msg.ready !== false;
+          room.broadcast(rematchMsg(room));
+          if (room.list.every((p) => p.rematch)) startGame(room);
           break;
         }
 
@@ -109,6 +131,7 @@ export function attach(manager, conn) {
           const outcome = room.game.result(room.state);
           if (outcome.over) {
             room.phase = PHASE.OVER;
+            for (const p of room.players.values()) p.rematch = false;
             for (const p of room.players.values()) {
               p.conn.send({ type: S2C.OVER, winnerId: outcome.winnerId, view: room.game.viewFor(room.state, p.id) });
             }

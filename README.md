@@ -1,84 +1,78 @@
-# 侠盗猎码 · Grand Theft Code
+# 深空轮盘 · Deep-Space Standoff
 
-> 一款用**真·Python** 和**真·C++** 闯关学编程的赛博朋克网页游戏。
-> 完全的新手小白能跟着剧情从“Hello World”一路打到递归塔；资深玩家也能在双语言、双解法之间找到乐子。
->
-> A cyberpunk browser game that teaches **real Python** and **real C++** through story-driven missions — from absolute beginner to recursion boss fights.
+深空轮盘是一个原创的赛博朋克 1v1 对决游戏：在实弹与空包组成的弹仓前选择瞄准自己或对手。它提供 Three.js 体素风 3D 前端、单人 AI 对局，以及由服务器裁决的 WebSocket 联机模式。
 
-在《侠盗猎码》里，你是初到**码德城（Codegrad City）**的菜鸟。在这座城市，枪没用，**代码才是火力**。你要替形形色色的 NPC 干活——给酒吧当门卫、帮出租车队写计圈器、潜入数据黑市——每一票“活儿”都是一道真实的编程题。代码跑过测试就拿赏金、攒声望、解锁新街区；写出 BUG 就会拉高你的「**BUG 通缉等级**」，警笛响起。
+本仓库的当前主项目是**深空轮盘**；保留的「侠盗猎码」文件属于历史项目，不在当前维护范围内。
 
----
+## 玩法
 
-## ✨ 特色 / Highlights
+- 三局两胜，双方初始生命按 4 → 3 → 2 递减。
+- 实弹会随每次装填递增，弹序始终由规则引擎/服务器保密。
+- 扫描仪、过载芯、退弹器、磁锁、香烟与相位护盾会随对局阶段开放；相位护盾仅在决胜局与怜悯局掉落。
+- 胜者可选择进入「怜悯决战」：再胜得双倍奖励，翻车则受到双倍惩罚。
+- 单人模式使用本地规则引擎；联机模式使用权威服务器，每名玩家只收到自己的视图。
+- 3D 单人练习提供训练、标准、猎杀三档 AI；所有档位都只读取公开视图，不会窥视隐藏弹序。
+- 联机结算后，双方确认即可在原房间自动再战，无需重新建房或交换房号。
 
-- **两套从零自研的解释器**，纯 JavaScript，浏览器里直接安全运行玩家代码，零后端、零网络请求：
-  - `js/interp/python.js` — Python 3 教学子集（变量、循环、函数、递归、列表/字典/字符串、f-string、80+ 内置/方法）
-  - `js/interp/cpp.js` — C++17 教学子集（`cout`/`cin`、`vector`/`string`、引用参数、递归、`sort`，并**忠实还原** int 截断除法、`%` 符号、`double` 的 `%g` 输出、数组越界“Segmentation fault”等真实语义）
-- **6 大街区 · 26 个任务**，从输出/变量一路递进到递归与汉诺塔，最后是 Boss 战「空指针先生」。每个任务都有 NPC 剧情简报、街头课堂讲解、3 级提示、参考答案。
-- **中英双语**，一键切换（界面 + 全部剧情文案）。
-- **诙谐的犯罪自由世界包装**：分赃计算器、洗钱汇率、后门暗号、回文车牌、FizzBuzz 改成「鸣笛守则」……梗密度拉满。
-- **精美赛博霓虹界面**：故障字效、扫描线、霓虹辉光、打字机对白、音效（Web Audio 合成，无音频文件）。
-- **游戏化系统**：现金、声望、星级评定、7 个成就、黑市皮肤/头衔商店、BUG 通缉等级、贿赂看答案。
-- **自带语法高亮代码编辑器**（行号、智能缩进、括号自动补全），外加无任务限制的「自由练码场」。
-- **完全离线可玩、纯静态**，可直接部署到 GitHub Pages。
+## 本地运行
 
-## 🎮 怎么玩 / Run it
-
-直接用浏览器打开 `index.html` 即可（纯静态，无需构建）。或启动自带的零依赖小服务器：
+前端和联机服务器是两个进程。先安装用于测试的开发依赖：
 
 ```bash
-npm start          # → http://localhost:8080
-# 或 / or
-node serve.mjs
+npm install
 ```
 
-存档自动保存在浏览器 `localStorage`，随时续上。
-
-## 🗺️ 街区地图 / Districts
-
-| # | 街区 District | 知识点 Concept |
-|---|---|---|
-| 1 | ⚓ 老码头 The Docks | 输出 · 变量 · 输入 · 运算 |
-| 2 | 🌃 霓虹大道 Neon Avenue | 条件判断 · 逻辑运算 |
-| 3 | 🛣️ 循环环路 The Loop | 循环 · break/continue · 嵌套 |
-| 4 | 🏦 函数金融区 Function District | 函数 · 参数 · 返回值 |
-| 5 | 🌑 数据黑市 Data Black Market | 列表/数组 · 排序 · 字符串 |
-| 6 | 🗼 递归塔 Recursion Tower | 递归 · 汉诺塔 · 最终 Boss |
-
-## 🧪 测试 / Tests
-
-核心解释器与关卡校验**零依赖**，随时可跑：
+终端一：启动静态前端服务器。
 
 ```bash
-npm test           # Python(83) + C++(76) + 关卡校验(164)
+npm start
+# http://localhost:8080/deepspace.html
 ```
 
-关卡校验会把**每个任务的参考答案在两种语言下分别跑过全部测试样例**，确保 26 个任务全部可解、双语一致。
-
-端到端集成测试用 jsdom 驱动真实 DOM（需先 `npm install`）：
+终端二：启动权威 WebSocket 服务器。
 
 ```bash
-npm run test:integration   # 37 项：导航 → 提交判定 → 经济/星级/成就 → 沙盒/商店/编辑器
+npm run start:server
+# ws://localhost:3001
 ```
 
-## 📁 结构 / Structure
+在游戏主菜单选择「联机模式」，两名玩家填入同一服务器地址；一人建房、另一人用房号加入并准备后，由房主开始对局。
 
-```
-index.html              入口页面
-css/style.css           样式（赛博霓虹 + 4 套可购买皮肤）
-js/
-  i18n.js               中英双语字符串与本地化
-  levels.js             6 街区 / 26 任务 / 商店 / 成就 数据
-  editor.js             轻量语法高亮编辑器
-  game.js               主游戏逻辑（界面、判题、经济、存档）
-  interp/python.js      Python 迷你解释器
-  interp/cpp.js         C++ 迷你解释器
-tests/                  Python / C++ / 关卡 / 集成 测试
-serve.mjs               零依赖静态服务器
+`deepspace-flat.html` 是不依赖 3D 场景的低配单人版本。当前尚未承诺具体浏览器/设备支持范围；联机与 3D 模式应优先在支持 WebGL 的现代桌面浏览器验证。
+
+## 验证
+
+```bash
+npm test
 ```
 
-## 🛠️ 扩展 / Extending
+默认测试覆盖深空轮盘规则、真实双客户端 WebSocket 流程，以及通用房间/WebSocket 传输层。完整执行历史项目的测试可运行：
 
-加一个新任务：在 `js/levels.js` 的 `missions` 数组里加一个对象，提供双语 `title/brief/task/knowledge/concept`、`starter`、`solution`、`tests`、3 条 `hints` 和奖励，然后 `npm test` 会自动校验你的参考答案能通过自己的测试。
+```bash
+npm run test:all
+```
 
-> 解释器是**教学子集**，刻意不支持类、模块导入、异常处理等高级特性，以保持新手友好和实现可控。错误信息经过精心设计，配合中英双语的“街头课堂”提示帮玩家从崩溃中学习。
+## 部署
+
+- 静态前端可部署到 GitHub Pages、Netlify 等静态站点；深空轮盘的资源与模块使用相对路径，兼容 GitHub Pages 的项目子路径。
+- WebSocket 服务器可部署到 Render、Railway、Fly.io 或自有 Node 主机，启动命令为 `node server/server.mjs`，健康检查地址为 `/healthz`。
+- HTTPS 页面必须连接 `wss://` 服务端。联机界面会在 HTTPS 页面中默认使用 `wss://`，但部署到独立域名时仍需填写正确的服务器地址。
+
+详细步骤见 [联机部署指南](docs/联机部署指南.md)。
+
+## 结构
+
+```text
+deepspace.html              3D 主入口
+deepspace-flat.html         低配单人入口
+js/deepspace-3d.mjs         3D 场景、HUD、单人/联机渲染
+js/deepspace-online.mjs     联机大厅
+server/games/deepspace.mjs  纯规则引擎与玩家视图裁剪
+server/lib/                 WebSocket、房间与消息引擎
+server/test/                规则、传输层与双客户端集成测试
+docs/                       游戏设计与部署说明
+```
+
+## 历史项目
+
+仓库中的 `index.html`、`js/interp/`、`js/levels.js`、`tests/` 等「侠盗猎码」文件会继续保留，但不会随深空轮盘迭代而修改；其回归测试仅在 `npm run test:legacy` 或 `npm run test:all` 中运行。

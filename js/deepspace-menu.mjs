@@ -1,9 +1,9 @@
 // 《深空轮盘》主菜单 + 流程编排（入口模块）。
 // 负责：标题闸门 -> 首次进入自动播放[背景故事动画]+[新手教程]；主菜单路由
-// （练习/联机(占位)/故事/教程/鸣谢/反馈/退出）；过场动画引擎；新手弹窗引导；mailto 反馈。
+// （练习难度/联机/故事/教程/鸣谢/反馈/退出）；过场动画引擎；新手弹窗引导；mailto 反馈。
 // 实际对局/3D/音效由 deepspace-3d.mjs 提供，这里只做编排。
-import { initGame, startMatch, audio, setReturnHandler, setStoryCam } from '/js/deepspace-3d.mjs';
-import { openOnline, bootOnline } from '/js/deepspace-online.mjs';
+import { initGame, startMatch, audio, setReturnHandler, setStoryCam, setTutorialLock } from './deepspace-3d.mjs';
+import { openOnline, bootOnline } from './deepspace-online.mjs';
 
 const HUMAN = 'you';
 const $ = (id) => document.getElementById(id);
@@ -66,7 +66,13 @@ function makeTutorial() {
     if (i >= steps.length || open) return;
     const s = steps[i];
     const ok = s.when ? (lastView && s.when(lastView)) : s.onEvent ? (events || []).some(s.onEvent) : true;
-    if (ok) { open = true; showCoach(s.text, () => { open = false; i++; tryShow([]); }); }
+    if (ok) {
+      open = true; setTutorialLock(true);
+      showCoach(s.text, () => {
+        open = false; i++; tryShow([]);
+        if (!open) setTutorialLock(false);
+      });
+    }
   }
   return (view, events) => { lastView = view; tryShow(events); };
 }
@@ -79,10 +85,11 @@ function showCoach(text, onOk) {
 // ---- 路由 ----
 function showMenu() { hideAllOverlays(); $('menu').hidden = false; }
 function hideAllOverlays() {
-  ['menu', 'feedbackScreen', 'exitScreen', 'coach', 'cinematic', 'startScreen', 'onlineScreen'].forEach((id) => { $(id).hidden = true; });
+  ['menu', 'difficultyScreen', 'feedbackScreen', 'exitScreen', 'coach', 'cinematic', 'startScreen', 'onlineScreen'].forEach((id) => { $(id).hidden = true; });
 }
 
-function startPractice() { $('menu').hidden = true; startMatch({}); }
+function openDifficulty() { hideAllOverlays(); $('difficultyScreen').hidden = false; }
+function startPractice(difficulty = 'standard') { hideAllOverlays(); startMatch({ difficulty }); }
 function startTutorial() { $('menu').hidden = true; startMatch({ dumb: true, onStep: makeTutorial() }); }
 
 async function playStory() { $('menu').hidden = true; await cine(STORY, { cam: true, rain: true }); }
@@ -121,7 +128,11 @@ function boot() {
   bootOnline();                // 接好联机大厅按钮
   setReturnHandler(showMenu);  // 对局结束/退出 -> 回主菜单
   $('enterBtn').onclick = enter;
-  $('mPractice').onclick = startPractice;
+  $('mPractice').onclick = openDifficulty;
+  $('diffTraining').onclick = () => startPractice('training');
+  $('diffStandard').onclick = () => startPractice('standard');
+  $('diffHard').onclick = () => startPractice('hard');
+  $('diffBack').onclick = showMenu;
   $('mOnline').onclick = () => openOnline(showMenu);
   $('mStory').onclick = async () => { await playStory(); showMenu(); };
   $('mTutorial').onclick = startTutorial;

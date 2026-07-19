@@ -1,8 +1,8 @@
 // 《深空轮盘》单人 vs AI 的 2D 前端控制器（扁平/低配版）。
 // 直接 import 纯规则引擎、AI 与共享音效引擎（同一套规则将来也能跑联机），整局在浏览器本地推进。
-import game, { ITEM_META } from '/server/games/deepspace.mjs';
-import { decideAction, decideMercy } from '/js/ai/deepspace-ai.mjs';
-import { AudioKit } from '/js/deepspace-audio.mjs';
+import game, { ITEM_META } from '../server/games/deepspace.mjs';
+import { decideAction, decideMercy } from './ai/deepspace-ai.mjs';
+import { AudioKit } from './deepspace-audio.mjs';
 
 const HUMAN = 'you';
 const AI = 'ai';
@@ -132,10 +132,12 @@ function renderFighter(elId, v, id, isYou) {
     const m = ITEM_META[it];
     return `<div class="item"><span class="ic">${m.icon}</span>${m.label}</div>`;
   }).join('') || '<span class="empty">无道具</span>';
+  const shield = v.shield && v.shield[id] ? '<span class="shield-status">🛡 相位护盾已展开</span>' : '';
   el.innerHTML = `
     <div class="who"><span class="nm">${id === HUMAN ? '你' : '仲裁者'}</span>
       <span class="tag">${isYou ? 'PRISONER' : 'ARBITER · 站务核心'}</span></div>
     <div class="hp">${cells}</div>
+    ${shield}
     <div class="items">${items}</div>`;
 }
 
@@ -167,7 +169,16 @@ function handleEvent(ev) {
     case 'shoot': {
       const live = ev.shell === 'live';
       const tgt = ev.target === 'self' ? '自己' : '对手';
-      if (live) { audio.bang(); shake(); flash('hit'); pulseDamage(ev.victim); log(`${ev.by} 抵住${tgt}扣下扳机 —— 实弹炸响！`, 'live'); }
+      if (live) {
+        const fullyAbsorbed = ev.shielded && ev.damage === 0;
+        audio.bang(); shake();
+        if (fullyAbsorbed) {
+          audio.beep(); flash('blank'); log(`${ev.by} 抵住${tgt}扣下扳机 —— 实弹撞上相位护盾，伤害被吸收。`, 'cyan');
+        } else {
+          const shield = ev.shielded ? ' 相位护盾吸收了 1 点伤害。' : '';
+          flash('hit'); pulseDamage(ev.victim); log(`${ev.by} 抵住${tgt}扣下扳机 —— 实弹炸响！${shield}`, 'live');
+        }
+      }
       else { audio.click(); flash('blank'); log(`${ev.by} 抵住${tgt}扣下扳机 —— 空响。`, ''); }
       break;
     }

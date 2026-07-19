@@ -1,12 +1,12 @@
 // 《深空轮盘》联机大厅：连接服务器、创建/加入房间、准备/开始，然后把对局交给
 // deepspace-3d 的 startOnline 来渲染。底层 WebSocket 用通用的 GameClient。
-import { GameClient } from '/js/net/client.mjs';
-import { startOnline } from '/js/deepspace-3d.mjs';
+import { GameClient } from './net/client.mjs';
+import { startOnline } from './deepspace-3d.mjs';
 
 const $ = (id) => document.getElementById(id);
 let client = null, myId = null, returnFn = null, myReady = false;
 
-const defaultUrl = () => `ws://${location.hostname || 'localhost'}:3001`;
+const defaultUrl = () => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.hostname || 'localhost'}:3001`;
 
 export function openOnline(onReturn) {
   returnFn = onReturn;
@@ -50,9 +50,19 @@ function renderLobby(m) {
   const me = m.players.find((p) => p.id === myId);
   const host = !!(me && me.host);
   myReady = !!(me && me.ready);
-  $('playerList').innerHTML = m.players.map((p) =>
-    `<div class="prow ${p.id === myId ? 'self' : ''}"><span>${p.host ? '👑 ' : ''}${p.name}${p.id === myId ? '（你）' : ''}</span>
-      <span class="${p.ready ? 'rdy' : 'wait'}">${p.host ? '房主' : p.ready ? '已准备' : '未准备'}</span></div>`).join('');
+  // 玩家代号来自网络，必须作为纯文本插入，不能交给 innerHTML 解析。
+  const rows = m.players.map((p) => {
+    const row = document.createElement('div');
+    row.className = `prow${p.id === myId ? ' self' : ''}`;
+    const name = document.createElement('span');
+    name.textContent = `${p.host ? '👑 ' : ''}${p.name}${p.id === myId ? '（你）' : ''}`;
+    const status = document.createElement('span');
+    status.className = p.ready ? 'rdy' : 'wait';
+    status.textContent = p.host ? '房主' : p.ready ? '已准备' : '未准备';
+    row.append(name, status);
+    return row;
+  });
+  $('playerList').replaceChildren(...rows);
   $('btnReady').textContent = myReady ? '取消准备' : '准备';
   $('btnReady').style.display = host ? 'none' : '';
   const canStart = host && m.players.length >= 2 && m.players.every((p) => p.ready || p.host);
