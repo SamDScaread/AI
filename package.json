@@ -1,0 +1,30 @@
+{
+  "name": "airlock-ante",
+  "version": "1.0.0",
+  "private": true,
+  "description": "气闸孤注：γ-7 — 3D 体素风实弹/空包对决，支持单机与权威 WebSocket 联机",
+  "author": "SamDScaread",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SamDScaread/airlock-ante.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SamDScaread/airlock-ante/issues"
+  },
+  "homepage": "https://github.com/SamDScaread/airlock-ante#readme",
+  "scripts": {
+    "test": "npm run test:deepspace && npm run test:server",
+    "test:all": "npm test && npm run test:legacy",
+    "test:deepspace": "node server/test/test_deepspace.mjs && node server/test/test_deepspace_ws.mjs",
+    "test:server": "node server/test/test_server.mjs && node server/test/test_ws_smoke.mjs",
+    "test:legacy": "node tests/test_python.mjs && node tests/test_cpp.mjs && node tests/test_levels.mjs && node tests/test_integration.mjs",
+    "test:integration": "node tests/test_integration.mjs",
+    "start": "node serve.mjs",
+    "start:server": "node server/server.mjs"
+  },
+  "keywords": ["game", "cyberpunk", "threejs", "multiplayer", "websocket", "voxel"],
+  "license": "MIT",
+  "devDependencies": {
+    "jsdom": "^24.0.0"
+  }
+}

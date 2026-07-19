@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>联机框架 Demo · Multiplayer Skeleton</title>
+<style>
+  :root { --bg:#0a0e14; --panel:#121823; --line:#243044; --ink:#cfe3ff; --dim:#7c8aa0; --neon:#39d0ff; --hot:#ff4d6d; --ok:#46e08b; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.5 ui-monospace,Menlo,Consolas,monospace; background:var(--bg); color:var(--ink); }
+  .wrap { max-width:760px; margin:0 auto; padding:24px 16px 64px; }
+  h1 { font-size:20px; letter-spacing:1px; }
+  h1 small { color:var(--dim); font-weight:normal; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; margin:14px 0; }
+  label { color:var(--dim); display:block; margin:8px 0 4px; font-size:13px; }
+  input { width:100%; padding:9px 10px; background:#0c121c; border:1px solid var(--line); border-radius:7px; color:var(--ink); font:inherit; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; }
+  .row > * { flex:1; min-width:120px; }
+  button { cursor:pointer; padding:10px 14px; border:1px solid var(--neon); background:transparent; color:var(--neon); border-radius:7px; font:inherit; transition:.15s; }
+  button:hover:not(:disabled) { background:var(--neon); color:#02121a; }
+  button:disabled { opacity:.35; cursor:not-allowed; }
+  button.alt { border-color:var(--line); color:var(--dim); }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; background:var(--hot); margin-right:6px; vertical-align:middle; }
+  .dot.on { background:var(--ok); }
+  .players li { list-style:none; padding:6px 0; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; }
+  .badge { font-size:11px; color:var(--dim); border:1px solid var(--line); border-radius:20px; padding:1px 8px; margin-left:6px; }
+  .badge.ready { color:var(--ok); border-color:var(--ok); }
+  .badge.host { color:var(--neon); border-color:var(--neon); }
+  .stones { font-size:26px; letter-spacing:3px; word-break:break-all; color:var(--neon); }
+  .turn { color:var(--hot); font-weight:bold; }
+  .log { height:140px; overflow:auto; background:#0c121c; border:1px solid var(--line); border-radius:7px; padding:8px; font-size:13px; color:var(--dim); }
+  .hide { display:none; }
+  .err { color:var(--hot); min-height:20px; font-size:13px; }
+  .win { font-size:20px; color:var(--ok); text-align:center; padding:10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎮 联机框架 Demo <small>— 取石子 Nim（用来验证网络链路）</small></h1>
+
+  <!-- 1) 连接服务器 -->
+  <div class="panel">
+    <label>游戏服务器地址 / Server URL</label>
+    <div class="row">
+      <input id="url" placeholder="ws://localhost:3001" />
+      <button id="connectBtn" style="flex:0 0 auto">连接</button>
+    </div>
+    <p style="margin:8px 0 0"><span id="status" class="dot"></span><span id="statusText">未连接</span></p>
+  </div>
+
+  <!-- 2) 大厅 -->
+  <div id="lobby" class="panel hide">
+    <div class="row">
+      <div><label>昵称 / Name</label><input id="name" placeholder="无名小白" /></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="createBtn">建房</button>
+      <div style="display:flex; gap:10px; flex:2">
+        <input id="code" placeholder="房间码 e.g. ABCD" style="text-transform:uppercase" />
+        <button id="joinBtn" class="alt" style="flex:0 0 auto">加入</button>
+      </div>
+    </div>
+    <div id="roomInfo" class="hide" style="margin-top:14px">
+      <p>房间码：<b id="roomCode" class="turn"></b>（把它发给朋友）</p>
+      <ul id="players" class="players"></ul>
+      <div class="row" style="margin-top:10px">
+        <button id="readyBtn" class="alt">准备</button>
+        <button id="startBtn" disabled>开始游戏（房主）</button>
+      </div>
+    </div>
+    <p id="err" class="err"></p>
+  </div>
+
+  <!-- 3) 游戏台 -->
+  <div id="game" class="panel hide">
+    <p>剩余石子：<span id="stones" class="stones"></span></p>
+    <p id="whose"></p>
+    <div class="row" id="takeButtons"></div>
+    <div id="winBanner" class="win hide"></div>
+    <label style="margin-top:14px">事件日志 / Log</label>
+    <div id="log" class="log"></div>
+  </div>
+</div>
+
+<script type="module">
+import { GameClient } from '/js/net/client.mjs';
+import { S2C } from '/shared/protocol.mjs';
+
+const $ = (id) => document.getElementById(id);
+const urlInput = $('url');
+urlInput.value = localStorage.getItem('mp_url') || 'ws://localhost:3001';
+
+let client = null;
+let myId = null;
+let amHost = false;
+
+function setStatus(on, text) {
+  $('status').classList.toggle('on', on);
+  $('statusText').textContent = text;
+}
+function log(line) {
+  const el = $('log');
+  el.innerHTML += line + '<br>';
+  el.scrollTop = el.scrollHeight;
+}
+
+$('connectBtn').onclick = async () => {
+  const url = urlInput.value.trim();
+  localStorage.setItem('mp_url', url);
+  setStatus(false, '连接中…');
+  client = new GameClient(url);
+
+  client.on('connected', () => { setStatus(true, '已连接'); $('lobby').classList.remove('hide'); });
+  client.on('disconnected', () => setStatus(false, '已断开'));
+  client.on(S2C.ERROR, (m) => { $('err').textContent = '⚠ ' + m.message; });
+
+  client.on(S2C.JOINED, (m) => {
+    myId = m.playerId;
+    $('roomCode').textContent = m.room;
+    $('roomInfo').classList.remove('hide');
+    $('err').textContent = '';
+  });
+
+  client.on(S2C.LOBBY, (m) => {
+    amHost = m.players.find((p) => p.id === myId)?.host || false;
+    $('players').innerHTML = m.players.map((p) => {
+      const tags = [p.host ? '<span class="badge host">房主</span>' : '',
+                    p.ready ? '<span class="badge ready">已准备</span>' : '<span class="badge">未准备</span>'].join('');
+      return `<li><span>${p.id === myId ? '👉 ' : ''}${escapeHtml(p.name)}</span><span>${tags}</span></li>`;
+    }).join('');
+    // 房主、人数达标、其余人都准备 -> 可开始
+    const others = m.players.filter((p) => !p.host);
+    const allReady = others.every((p) => p.ready) && m.players.length >= 2;
+    $('startBtn').disabled = !(amHost && allReady);
+  });
+
+  client.on(S2C.STATE, (m) => renderGame(m.view, null));
+  client.on(S2C.EVENT, (m) => {
+    const e = m.event;
+    if (e.kind === 'take') log(`${escapeHtml(e.by)} 取走了 ${e.take} 颗，剩 ${e.left}`);
+  });
+  client.on(S2C.OVER, (m) => renderGame(m.view, m.winnerId));
+
+  try { await client.connect(); }
+  catch { setStatus(false, '连接失败，检查地址和服务器是否已启动'); }
+};
+
+$('createBtn').onclick = () => client?.create(nameValue());
+$('joinBtn').onclick = () => client?.join($('code').value.trim().toUpperCase(), nameValue());
+$('readyBtn').onclick = () => { window._ready = !window._ready; client?.ready(window._ready); $('readyBtn').textContent = window._ready ? '取消准备' : '准备'; };
+$('startBtn').onclick = () => client?.start();
+
+function nameValue() { return $('name').value.trim() || '无名小白'; }
+
+function renderGame(view, winnerId) {
+  if (!view) return;
+  $('lobby').classList.add('hide');
+  $('game').classList.remove('hide');
+  $('stones').textContent = '◍ '.repeat(Math.max(0, view.pile)).trim() || '（空）';
+  const myTurn = view.turnId === myId;
+  const turnName = view.players.find((p) => p.id === view.turnId)?.name || '?';
+  $('whose').innerHTML = winnerId != null ? '' : (myTurn ? '<span class="turn">轮到你了！</span>' : `等待 <b>${escapeHtml(turnName)}</b> 行动…`);
+
+  const limit = Math.min(view.maxTake, view.pile);
+  $('takeButtons').innerHTML = '';
+  if (winnerId == null) {
+    for (let n = 1; n <= limit; n++) {
+      const btn = document.createElement('button');
+      btn.textContent = `取 ${n} 颗`;
+      btn.disabled = !myTurn;
+      btn.onclick = () => client.action({ take: n });
+      $('takeButtons').appendChild(btn);
+    }
+  }
+  if (winnerId != null) {
+    const banner = $('winBanner');
+    banner.classList.remove('hide');
+    banner.textContent = winnerId === myId ? '🏆 你赢了！' : '💀 你输了…';
+  }
+}
+
+function escapeHtml(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+{
+  "_help": "在 characters 数组里登记你的 .glb 模型：把文件放进本目录(assets/models/)，再加一条记录即可，无需改代码。role: opponent=对面对手(单机默认显示)；you=你自己(联机时展示给对方，暂存用)。可选微调字段：scale(整体放大,1=自动适配身高)、rotY(朝向,弧度,背对镜头填3.14159)、yOffset(上下偏移)、targetH(目标身高)。",
+  "_example": { "key": "alice", "name": "爱丽丝", "file": "alice.glb", "role": "opponent", "scale": 1, "rotY": 0, "yOffset": 0 },
+  "characters": []
+}

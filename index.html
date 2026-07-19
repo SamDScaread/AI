@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="description" content="侠盗猎码 Grand Theft Code — 用真·Python 和真·C++ 闯关学编程的赛博朋克游戏">
+<title>侠盗猎码 · Grand Theft Code</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
+</head>
+<body class="theme-neon-noir">
+
+<!-- scanline + grid backdrop -->
+<div class="bg-grid"></div>
+<div class="bg-scanline"></div>
+<div id="wanted-flash"></div>
+
+<!-- ============ HUD ============ -->
+<header id="hud">
+  <div class="hud-left">
+    <button id="btn-hud-home" class="hud-logo" title="Home">侠盗猎码<span class="logo-en">GTC</span></button>
+    <span id="hud-title" class="hud-title-badge"></span>
+  </div>
+  <div class="hud-stats">
+    <span id="hud-cash" class="hud-stat"></span>
+    <span id="hud-respect" class="hud-stat"></span>
+    <span id="hud-wanted" class="hud-stat"></span>
+  </div>
+  <nav class="hud-nav">
+    <button id="btn-hud-map" class="hud-btn">🗺️</button>
+    <button id="btn-hud-market" class="hud-btn">🌑</button>
+    <button id="btn-hud-achv" class="hud-btn">🏆</button>
+    <button id="btn-hud-sandbox" class="hud-btn">🔧</button>
+    <button id="btn-hud-mute" class="hud-btn">🔊</button>
+    <button id="btn-hud-lang" class="hud-btn hud-lang">EN</button>
+  </nav>
+</header>
+
+<!-- ============ SPLASH ============ -->
+<section id="screen-splash" class="screen active">
+  <div class="splash-inner">
+    <div class="splash-logo">
+      <h1 id="splash-title-main" class="glitch" data-text="侠盗猎码">侠盗猎码</h1>
+      <h2 id="splash-title-sub" class="splash-sub-en">GRAND THEFT CODE</h2>
+    </div>
+    <p id="splash-subtitle" class="splash-subtitle"></p>
+    <div class="splash-actions">
+      <button id="btn-start" class="btn btn-primary btn-xl"></button>
+      <button id="btn-splash-sandbox" class="btn btn-ghost"></button>
+      <button id="btn-splash-lang" class="btn btn-ghost"></button>
+    </div>
+    <p id="splash-tip" class="splash-tip"></p>
+    <div class="splash-cars">🚗💨　🚓💨</div>
+  </div>
+</section>
+
+<!-- ============ MAP ============ -->
+<section id="screen-map" class="screen">
+  <div class="screen-pad">
+    <h2 id="map-title" class="screen-title"></h2>
+    <div id="map-progress" class="map-progress"></div>
+    <div id="map-grid" class="map-grid"></div>
+  </div>
+</section>
+
+<!-- ============ DISTRICT ============ -->
+<section id="screen-district" class="screen">
+  <div class="screen-pad">
+    <button id="btn-district-back" class="btn btn-back"></button>
+    <h2 id="district-name" class="screen-title district-title"></h2>
+    <div id="district-missions" class="district-missions"></div>
+  </div>
+</section>
+
+<!-- ============ MISSION ============ -->
+<section id="screen-mission" class="screen">
+  <div class="mission-layout">
+    <!-- left: story + objective -->
+    <div class="mission-left">
+      <button id="btn-mission-back" class="btn btn-back"></button>
+      <div class="mission-headline">
+        <h2 id="mission-title"></h2>
+        <span id="mission-concept" class="mission-concept-pill"></span>
+      </div>
+      <h3 id="h-briefing" class="info-h"></h3>
+      <div class="npc-card">
+        <div class="npc-avatar"><span id="npc-emoji">🧔</span></div>
+        <div class="npc-bubble">
+          <div class="npc-name" id="npc-name"></div>
+          <div id="mission-brief" class="npc-brief"></div>
+        </div>
+      </div>
+      <div class="info-block">
+        <h3 id="h-objective" class="info-h"></h3>
+        <div id="mission-objective" class="info-body"></div>
+      </div>
+      <details class="info-block collapsible" open>
+        <summary id="h-knowledge" class="info-h"></summary>
+        <div id="mission-knowledge" class="info-body knowledge-body"></div>
+      </details>
+      <div class="info-block">
+        <h3 id="h-examples" class="info-h"></h3>
+        <div id="mission-examples" class="info-body"></div>
+      </div>
+      <div class="hint-zone">
+        <div id="hints-box" class="hints-box"></div>
+        <button id="btn-hint" class="btn btn-hint"></button>
+        <button id="btn-bribe" class="btn btn-bribe"></button>
+      </div>
+    </div>
+
+    <!-- right: editor + console -->
+    <div class="mission-right">
+      <div class="editor-bar">
+        <div class="lang-tabs">
+          <button id="tab-py" class="lang-tab active">Python</button>
+          <button id="tab-cpp" class="lang-tab">C++</button>
+        </div>
+        <button id="btn-reset" class="btn btn-mini"></button>
+      </div>
+      <div id="editor-host" class="editor-host"></div>
+      <div class="action-bar">
+        <button id="btn-run" class="btn btn-run"></button>
+        <button id="btn-submit" class="btn btn-submit"></button>
+      </div>
+      <div class="io-zone">
+        <div class="io-col">
+          <h4 id="h-custom-input" class="io-h"></h4>
+          <textarea id="custom-stdin" class="io-input" spellcheck="false"></textarea>
+        </div>
+        <div class="io-col io-col-wide">
+          <h4 id="h-console" class="io-h"></h4>
+          <div id="console-out" class="console-out"></div>
+          <div id="test-results" class="test-results"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SANDBOX ============ -->
+<section id="screen-sandbox" class="screen">
+  <div class="screen-pad">
+    <h2 id="sandbox-title" class="screen-title"></h2>
+    <p id="sandbox-desc" class="sandbox-desc"></p>
+    <div class="sandbox-layout">
+      <div class="sandbox-editor-wrap">
+        <div class="editor-bar">
+          <div class="lang-tabs">
+            <button id="sb-tab-py" class="lang-tab active">Python</button>
+            <button id="sb-tab-cpp" class="lang-tab">C++</button>
+          </div>
+          <button id="btn-sb-run" class="btn btn-run"></button>
+        </div>
+        <div id="sandbox-editor-host" class="editor-host editor-host-tall"></div>
+      </div>
+      <div class="sandbox-io">
+        <h4 id="h-sb-input" class="io-h"></h4>
+        <textarea id="sb-stdin" class="io-input" spellcheck="false"></textarea>
+        <h4 class="io-h">🖥️ OUTPUT</h4>
+        <div id="sandbox-out" class="console-out console-out-tall"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ MODALS ============ -->
+<div id="modal-backdrop" class="modal-backdrop"></div>
+
+<!-- win -->
+<div id="modal-win" class="modal modal-win">
+  <div class="win-banner">🎉</div>
+  <h2 id="win-title" class="win-title"></h2>
+  <div id="win-mission-name" class="win-mission"></div>
+  <div id="win-stars" class="win-stars"></div>
+  <div id="win-reward" class="win-reward"></div>
+  <div id="win-quip" class="win-quip"></div>
+  <div class="win-actions">
+    <button id="btn-win-next" class="btn btn-primary"></button>
+    <button id="btn-win-replay" class="btn btn-ghost"></button>
+    <button id="btn-win-map" class="btn btn-ghost"></button>
+  </div>
+</div>
+
+<!-- solution -->
+<div id="modal-solution" class="modal modal-solution">
+  <button class="modal-close">✕</button>
+  <h3 id="solution-title" class="modal-h"></h3>
+  <pre class="solution-pre"><code id="solution-code"></code></pre>
+</div>
+
+<!-- market -->
+<div id="modal-market" class="modal modal-market">
+  <button class="modal-close">✕</button>
+  <h3 id="market-title" class="modal-h"></h3>
+  <div id="market-body" class="market-body"></div>
+</div>
+
+<!-- achievements -->
+<div id="modal-achv" class="modal modal-achv">
+  <button class="modal-close">✕</button>
+  <h3 id="achv-title" class="modal-h"></h3>
+  <div id="achv-body" class="achv-body"></div>
+</div>
+
+<!-- toasts -->
+<div id="toasts" class="toasts"></div>
+
+<!-- ============ SCRIPTS ============ -->
+<script src="js/i18n.js"></script>
+<script src="js/levels.js"></script>
+<script src="js/interp/python.js"></script>
+<script src="js/interp/cpp.js"></script>
+<script src="js/editor.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>

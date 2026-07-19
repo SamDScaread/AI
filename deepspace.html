@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>气闸孤注：γ-7 · Airlock Ante</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='50' font-size='50'%3E%F0%9F%9A%80%3C/text%3E%3C/svg%3E" />
+<link rel="stylesheet" href="./css/deepspace.css" />
+<link rel="stylesheet" href="./css/deepspace3d.css" />
+<script type="importmap">
+{ "imports": { "three": "./js/vendor/three.module.js" } }
+</script>
+</head>
+<body>
+<div id="app">
+
+  <!-- 3D 体素舞台（同时作为菜单/过场的背景） -->
+  <div id="stage"></div>
+
+  <!-- 对局 HUD -->
+  <div id="hud" hidden>
+    <div class="topbar">
+      <div id="roundTag">第一局</div>
+      <div id="winsTag"></div>
+    </div>
+    <div id="magReadout"></div>
+
+    <div class="fighter you" id="youPanel"></div>
+    <div class="fighter opp" id="oppPanel"></div>
+
+    <section class="controls" id="controls" aria-disabled="true">
+      <button class="shoot-self" id="shootSelf" disabled>抵住自己 · 扣下扳机</button>
+      <button class="shoot-opp" id="shootOpp" disabled>瞄准仲裁者 · 开枪</button>
+      <div id="itemBar"></div>
+      <div class="hint" id="hint"></div>
+    </section>
+  </div>
+
+  <!-- 标题闸门（首屏，点击解锁音频） -->
+  <div id="startScreen" class="overlay">
+    <div class="title">气闸孤注：γ-7</div>
+    <div class="subtitle">γ-7 气闸厅 · 实弹与空包的对赌</div>
+    <button class="btn-major" id="enterBtn">进 入</button>
+    <div class="warn">建议佩戴耳机 · 含强烈音效、闪烁与画面震动 · 体素 3D 渲染</div>
+  </div>
+
+  <!-- 主菜单 -->
+  <div id="menu" class="overlay" hidden>
+    <div class="title menu-title">气闸孤注：γ-7</div>
+    <div class="subtitle">γ-7 气闸厅</div>
+    <nav class="menu-list">
+      <button id="mPractice">练习模式</button>
+      <button id="mOnline">联机模式</button>
+      <button id="mStory">背景故事</button>
+      <button id="mTutorial">新手教程</button>
+      <button id="mCredits">开发人员</button>
+      <button id="mFeedback">向设计师反馈</button>
+      <button id="mQuit">退出游戏</button>
+    </nav>
+  </div>
+
+  <!-- 单机 AI 难度 -->
+  <div id="difficultyScreen" class="overlay" hidden>
+    <div class="verdict">选择演算强度</div>
+    <p class="flavor">三档对手都只读取公开信息，不会窥视隐藏弹序。</p>
+    <nav class="menu-list">
+      <button id="diffTraining">训练 · 手下留情</button>
+      <button class="grant" id="diffStandard">标准 · 概率博弈</button>
+      <button id="diffHard">猎杀 · 全力演算</button>
+      <button id="diffBack">返回主菜单</button>
+    </nav>
+  </div>
+
+  <!-- 过场动画（背景故事 / 鸣谢） -->
+  <div id="cinematic" class="overlay cine" hidden>
+    <div id="cineRain" hidden></div>
+    <div id="cineText" class="cine-text"></div>
+    <button id="cineSkip" class="cine-skip">跳过 ▸</button>
+  </div>
+
+  <!-- 联机大厅 -->
+  <div id="onlineScreen" class="overlay" hidden>
+    <div class="verdict">联机对战</div>
+    <div id="onlineConnect" class="online-pane">
+      <label class="fld">服务器地址<input id="srvUrl" class="inp" placeholder="ws://主机:3001" /></label>
+      <label class="fld">你的代号<input id="plName" class="inp" maxlength="20" /></label>
+      <div class="online-actions">
+        <button class="grant" id="btnCreate">创建房间</button>
+        <span class="join-row"><input id="joinCode" class="inp code" placeholder="房号" maxlength="4" /><button id="btnJoin">加入</button></span>
+      </div>
+      <div id="onlineMsg" class="online-msg"></div>
+      <button id="onlineBack">返回</button>
+    </div>
+    <div id="onlineLobby" class="online-pane" hidden>
+      <div class="room-code">房号　<b id="roomCode">----</b></div>
+      <div id="playerList" class="player-list"></div>
+      <div class="online-actions">
+        <button id="btnReady">准备</button>
+        <button class="grant" id="btnStart" disabled>开始对决</button>
+        <button id="btnLeave">离开</button>
+      </div>
+      <div id="lobbyHint" class="online-msg"></div>
+    </div>
+  </div>
+
+  <!-- 反馈（mailto） -->
+  <div id="feedbackScreen" class="overlay" hidden>
+    <div class="verdict">向设计师反馈</div>
+    <p class="flavor">写下你的想法、bug 或点子。点击发送会打开你的邮件 App、内容已填好，确认后即发往设计师邮箱。</p>
+    <textarea id="fbText" class="fb-text" placeholder="在这里写下你的反馈……"></textarea>
+    <div class="mercy-actions">
+      <button class="grant" id="fbSend">用邮件发送</button>
+      <button id="fbCancel">返回</button>
+    </div>
+  </div>
+
+  <!-- 退出 -->
+  <div id="exitScreen" class="overlay" hidden>
+    <div class="verdict">气闸已关闭</div>
+    <p class="flavor">感谢游玩《气闸孤注：γ-7》。<br>你可以直接关闭此标签页 —— 或者，再赌一把？</p>
+    <button class="btn-major" id="exitBack">返回主菜单</button>
+  </div>
+
+  <!-- 新手引导弹窗 -->
+  <div id="coach" class="coach" hidden>
+    <div id="coachText" class="coach-text"></div>
+    <button id="coachOk" class="coach-ok">知道了</button>
+  </div>
+
+  <!-- 怜悯抉择 -->
+  <div id="mercyScreen" class="overlay" hidden>
+    <div class="verdict">怜 悯 抉 择</div>
+    <p class="flavor" id="mercyText"></p>
+    <div class="mercy-actions">
+      <button class="grant" id="mercyGrant">赦免 · 拖它回场</button>
+      <button class="exec" id="mercyExec">处决 · 收下胜利</button>
+    </div>
+  </div>
+
+  <!-- 结算 -->
+  <div id="endScreen" class="overlay" hidden></div>
+
+  <!-- 战斗日志 -->
+  <aside id="log"></aside>
+
+  <!-- 全屏特效层 -->
+  <div id="mist"></div>
+  <div id="scanlines"></div>
+  <div id="vignette"></div>
+  <div id="glitch"></div>
+  <div id="flash"></div>
+  <div id="blackout"></div>
+</div>
+
+<script type="module" src="./js/deepspace-menu.mjs"></script>
+</body>
+</html>

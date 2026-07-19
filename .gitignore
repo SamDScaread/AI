@@ -1,0 +1,18 @@
+node_modules/
+*.log
+.DS_Store
+.vscode/
+.idea/
+
+# 本地配置、凭据和私钥不得入库。
+.env
+.env.*
+!.env.example
+.secrets/
+secrets/
+*.key
+*.pem
+*.p12
+*.pfx
+# 真人/个人角色模型不入库（隐私）。把 .glb 放在本地 assets/models/ 即可，并在 manifest.json 登记。
+assets/models/*.glb
